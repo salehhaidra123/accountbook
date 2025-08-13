@@ -1,0 +1,70 @@
+package com.my.myapp;
+
+import android.content.Context;
+import android.view.LayoutInflater;
+import android.view.ViewGroup;
+import android.view.View;
+
+import android.widget.BaseAdapter;
+import android.widget.TextView;
+import java.text.DecimalFormat;
+import java.util.Locale;
+import java.text.DecimalFormatSymbols;
+import java.util.ArrayList;
+
+public class AllAccountsAdapter extends BaseAdapter {
+	Context context;
+	ArrayList<Account> accountList;
+
+	public AllAccountsAdapter(Context context, ArrayList<Account> accountList) {
+		this.context = context;
+		this.accountList = accountList;
+
+	}
+
+	@Override
+	public int getCount() {
+		return accountList.size();
+	}
+
+	@Override
+	public Object getItem(int position) {
+		return accountList.get(position);
+	}
+
+	@Override
+	public long getItemId(int position) {
+		return accountList.get(position).getAccountId();
+	}
+
+	@Override
+	public View getView(int position, View convertView, ViewGroup parent) {
+
+		if (convertView == null) {
+			convertView = LayoutInflater.from(context).inflate(R.layout.list_item_all_accounts, parent, false);
+
+			TextView id = convertView.findViewById(R.id.tv_id);
+			TextView name = convertView.findViewById(R.id.tv_name);
+			TextView balance = convertView.findViewById(R.id.tv_balance);
+
+			DatabaseHelper dbHelper = new DatabaseHelper(context);
+
+			Account newAccount = accountList.get(position);
+			id.setText(String.valueOf(newAccount.getAccountId()));
+			name.setText(newAccount.getAccountName());
+
+			double newBalance = dbHelper.getAccountBalanceByType(newAccount.getAccountId(),
+					newAccount.getAccountType());
+
+			DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.getDefault());
+			symbols.setGroupingSeparator(',');
+			DecimalFormat formatter = new DecimalFormat("#,###.##", symbols);
+			
+			balance.setText(formatter.format(newBalance));
+
+		}
+
+		return convertView;
+	}
+
+}

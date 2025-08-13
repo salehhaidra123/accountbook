@@ -1,0 +1,75 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:padding="0dp" >
+
+<LinearLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="20dp"
+android:background="@color/teal_700"
+android:orientation="horizontal"
+android:paddingEnd="2dp" >
+
+<!-- ID -->
+
+<TextView
+android:id="@+id/tv_list_id"
+android:layout_width="50dp"
+android:layout_height="match_parent"
+android:layout_marginStart="4dp"
+android:gravity="center"
+android:text="ID"
+android:textColor="#000000"
+android:textSize="16sp" />
+
+<View
+android:layout_width="1dp"
+android:layout_height="match_parent"
+android:layout_marginHorizontal="4dp"
+android:background="#999999" />
+
+<!-- NAME -->
+
+<TextView
+android:id="@+id/tv_list_name"
+android:layout_width="200dp"
+android:layout_height="match_parent"
+android:gravity="center"
+android:text="@string/hint_cust_name"
+android:textColor="#000000"
+android:textSize="16sp" />
+
+<View
+android:layout_width="1dp"
+android:layout_height="match_parent"
+android:layout_marginHorizontal="4dp"
+android:background="#999999" />
+
+<!-- BALANCE -->
+
+<TextView
+android:id="@+id/tv_list_balance"
+android:layout_width="130dp"
+android:layout_height="match_parent"
+android:gravity="center"
+android:text="@string/hint_balance"
+android:textColor="#000000"
+android:textSize="16sp" />
+</LinearLayout>
+
+<ListView
+android:id="@+id/list_view_customers"
+android:layout_width="match_parent"
+android:layout_height="match_parent" />
+
+<Button
+android:id="@+id/btn_export_pdf"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:layout_marginBottom="12dp"
+android:layout_gravity="bottom"
+android:text="تصدير العملاء إلى PDF" />
+
+</LinearLayout>

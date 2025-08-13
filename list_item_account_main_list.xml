@@ -1,0 +1,56 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="30dp"
+android:orientation="horizontal"
+android:padding="0dp" >
+
+
+
+
+<!-- NAME -->
+
+<TextView
+android:id="@+id/tv_list_name"
+android:layout_width="180dp"
+android:layout_height="match_parent"
+android:gravity="center"
+android:text="اسم الحساب"
+android:textColor="@color/textPrimary"
+android:textSize="16sp" />
+
+<!-- NUMBER OF CONSTRAINTS-->
+<TextView
+android:id="@+id/tv_num_of_const"
+android:layout_width="20dp"
+android:layout_height="wrap_content"
+android:layout_weight="0"
+android:textColor="@color/textPrimary"
+android:gravity="center"
+android:text="4"
+android:textSize="20sp" />
+
+
+<!-- balance -->
+<TextView
+android:id="@+id/tv_balance"
+android:layout_width="160dp"
+android:layout_height="wrap_content"
+android:textColor="@color/textPrimary"
+android:gravity="center"
+android:text="1500"
+android:textSize="18sp" />
+
+
+<!-- Indicator-->
+<TextView
+android:id="@+id/tv_indicator"
+android:layout_width="20dp"
+android:layout_height="wrap_content"
+android:layout_gravity="center"
+android:textColor="@color/textPrimary"
+android:layout_marginStart="0dp"
+android:gravity="center"
+android:textSize="22sp" 
+/>
+
+</LinearLayout>

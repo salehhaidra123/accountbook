@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:padding="16dp"
+android:background="@android:color/white">
+
+<!-- TITILE -->
+<TextView
+android:id="@+id/dialog_title"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:text="إضافة قيد جديد"
+android:textSize="18sp"
+android:textStyle="bold"
+android:gravity="center"
+android:paddingBottom="12dp" />
+
+<!-- DATE -->
+<EditText
+android:id="@+id/edit_text_date"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:hint="التاريخ"
+android:focusable="false"
+android:inputType="none"
+android:drawableEnd="@drawable/ic_calendar"
+android:background="@drawable/edittext_background"
+android:padding="10dp"
+android:textAlignment="viewStart" />
+
+<!-- DETAILS -->
+<EditText
+android:id="@+id/edit_text_details"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:hint="البيان"
+android:background="@drawable/edittext_background"
+android:padding="10dp"
+android:singleLine="true"
+android:layout_marginTop="10dp" />
+
+<!-- DEBIT -->
+<EditText
+android:id="@+id/edit_text_debit"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:hint="مدين"
+android:inputType="numberDecimal"
+android:background="@drawable/edittext_background"
+android:padding="10dp"
+android:layout_marginTop="10dp" />
+
+<!-- CREDIT -->
+<EditText
+android:id="@+id/edit_text_credit"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:hint="دائن"
+android:inputType="numberDecimal"
+android:background="@drawable/edittext_background"
+android:padding="10dp"
+android:layout_marginTop="10dp" />
+
+<!-- أزرار حفظ وإلغاء -->
+<LinearLayout
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="horizontal"
+android:layout_marginTop="16dp"
+android:gravity="end">
+
+<Button
+android:id="@+id/btn_cancel"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="إلغاء"
+android:layout_marginEnd="8dp"
+android:textColor="@android:color/black"
+android:backgroundTint="@android:color/darker_gray" />
+
+<Button
+android:id="@+id/btn_save_constraint"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="حفظ"
+android:textColor="@android:color/white"
+android:backgroundTint="@color/purple_500" />
+</LinearLayout>
+
+</LinearLayout>

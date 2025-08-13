@@ -1,0 +1,133 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/white"
+    android:orientation="vertical"
+    android:padding="16dp" >
+
+    <!-- TITILE -->
+
+    <TextView
+        android:id="@+id/dialog_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingBottom="12dp"
+        android:text="إضافة قيد جديد"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <!-- TYPE + DATE -->
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal"
+        android:weightSum="2" >
+
+        <!-- Constraint Type -->
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/type_input_layout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:hint="نوع القيد"
+			hintAnimationEnabled="true" 
+			boxBackgroundMode="outline">
+
+            <AutoCompleteTextView
+                android:id="@+id/auto_complete_constraint_type"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/edittext_background"
+                android:drawableEnd="@drawable/ic_dropdown"
+				android:gravity="center"
+                android:focusable="true"
+				android:clickable="true"
+                android:inputType="text"
+                android:padding="10dp" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Date -->
+
+        <EditText
+            android:id="@+id/edit_text_date"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/edittext_background"
+            android:drawableEnd="@drawable/ic_calendar"
+            android:focusable="false"
+            android:hint="التاريخ"
+            android:inputType="none"
+            android:padding="10dp"
+            android:textAlignment="viewStart" />
+    </LinearLayout>
+
+    <!-- DETAILS -->
+
+    <EditText
+        android:id="@+id/edit_text_details"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/edittext_background"
+        android:hint="البيان"
+        android:padding="10dp"
+        android:singleLine="true" />
+
+    <!-- DEBIT -->
+
+    <EditText
+        android:id="@+id/edit_text_debit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/edittext_background"
+        android:hint="مدين"
+        android:inputType="numberDecimal"
+        android:padding="10dp" />
+
+    <!-- CREDIT -->
+
+    <EditText
+        android:id="@+id/edit_text_credit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/edittext_background"
+        android:hint="دائن"
+        android:inputType="numberDecimal"
+        android:padding="10dp" />
+
+    <!-- أزرار حفظ وإلغاء -->
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="end"
+        android:orientation="horizontal" >
+
+        <Button
+            android:id="@+id/btn_edit_constraint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/purple_500"
+            android:text="حفظ"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btn_cancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="@android:color/darker_gray"
+            android:text="إلغاء"
+            android:textColor="@android:color/black" />
+    </LinearLayout>
+
+</LinearLayout>

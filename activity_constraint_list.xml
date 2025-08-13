@@ -1,0 +1,112 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="match_parent">
+
+<!-- Toolbar -->
+<androidx.appcompat.widget.Toolbar
+android:id="@+id/toolbar"
+android:layout_width="match_parent"
+android:layout_height="?attr/actionBarSize"
+android:background="@color/purple_500"
+android:title="قائمة القيود"
+android:titleTextColor="@android:color/black" />
+
+<!-- ScrollView أفقي يغلف header + recyclerview -->
+<HorizontalScrollView
+android:id="@+id/scroll_view_horizontal"
+android:layout_width="match_parent"
+android:layout_height="match_parent"
+android:layout_below="@id/toolbar"
+android:layout_above="@id/bottomBar"
+android:fillViewport="true"
+android:scrollbars="horizontal">
+
+<LinearLayout
+android:layout_width="wrap_content"
+android:layout_height="match_parent"
+android:orientation="vertical">
+
+<!-- include header layout -->
+<include layout="@layout/layout_constraint_header" />
+
+<!-- RecyclerView -->
+<androidx.recyclerview.widget.RecyclerView
+android:id="@+id/recycler_view"
+android:layout_width="wrap_content"
+android:layout_height="0dp"
+android:layout_weight="1"
+android:clipToPadding="false"/>
+</LinearLayout>
+</HorizontalScrollView>
+
+<!-- Bottom bar -->
+<RelativeLayout
+android:id="@+id/bottomBar"
+android:layout_width="match_parent"
+android:layout_height="?attr/actionBarSize"
+android:layout_alignParentBottom="true"
+android:background="@color/purple_200"
+android:padding="4dp">
+
+<ImageButton
+android:id="@+id/btn_add_constraint"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:layout_alignParentStart="true"
+android:layout_centerVertical="true"
+android:background="@android:color/transparent"
+android:src="@drawable/ic_btn_add_rounded" />
+
+<ImageButton
+android:id="@+id/btn_exchange"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:layout_toEndOf="@id/btn_add_constraint"
+android:layout_alignBottom="@id/btn_add_constraint"
+android:layout_marginStart="16dp"
+android:background="@android:color/transparent"
+android:src="@drawable/ic_exchange" />
+
+<!--DEBIT-->
+<TextView
+android:id="@+id/tv_debit"
+android:layout_width="130dp"
+android:layout_height="wrap_content"
+android:layout_toEndOf="@id/btn_exchange"
+android:layout_alignParentTop="true"
+android:layout_marginStart="32dp"
+android:gravity="center"
+android:text="مدين"
+android:textSize="18sp"
+android:textColor="@color/black"
+ />
+ <!--CREDIT-->
+ <TextView
+android:id="@+id/tv_credit"
+android:layout_width="130dp"
+android:layout_height="wrap_content"
+android:layout_toEndOf="@id/tv_debit"
+android:layout_alignParentTop="true"
+android:layout_marginStart="32dp"
+android:gravity="center"
+android:text="دائن"
+android:textSize="18sp"
+android:textColor="@color/black"
+ />
+ 
+ <!--balance-->
+ <TextView
+android:id="@+id/tv_balance"
+android:layout_width="150dp"
+android:layout_height="wrap_content"
+android:layout_alignStart="@id/tv_debit"
+android:layout_alignParentBottom="true"
+android:layout_marginStart="64dp"
+android:gravity="center"
+android:textStyle="bold"
+android:text="الرصيد"
+android:textSize="18sp"
+android:textColor="@color/black"
+ />
+</RelativeLayout>
+</RelativeLayout>

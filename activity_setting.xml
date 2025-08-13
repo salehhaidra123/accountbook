@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="match_parent"
+android:orientation="vertical">
+
+<!-- Toolbar -->
+<androidx.appcompat.widget.Toolbar
+android:id="@+id/toolbar"
+android:layout_width="match_parent"
+android:layout_height="?attr/actionBarSize"
+android:background="@color/purple_200"
+android:title="الإعدادات"
+android:titleTextColor="@android:color/white" />
+
+<!-- محتوى Scroll -->
+<ScrollView
+android:layout_width="match_parent"
+android:layout_height="0dp"
+android:layout_weight="1"
+android:background="?android:attr/windowBackground">
+
+<LinearLayout
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:padding="16dp">
+
+<!-- FIRST CHOISE -->
+<LinearLayout
+android:id="@+id/layout_account_dashboard"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:background="?android:attr/selectableItemBackground"
+android:padding="12dp"
+android:clickable="true"
+android:focusable="true">
+
+<TextView
+android:id="@+id/tv_account_list"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="@string/accounts_dashboard"
+android:textSize="16sp"
+android:textStyle="bold"
+android:textColor="#000000" />
+</LinearLayout>
+
+<View
+android:layout_width="match_parent"
+android:layout_height="1dp"
+android:layout_marginVertical="8dp"
+android:background="#CCCCCC" />
+
+<!-- SECOND CHOISE -->
+<LinearLayout
+android:id="@+id/layout_another_account"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:background="?android:attr/selectableItemBackground"
+android:padding="12dp"
+android:clickable="true"
+android:focusable="true">
+
+<TextView
+android:id="@+id/tv_another_account"
+android:layout_width="wrap_content"
+android:layout_height="wrap_content"
+android:text="الخيار الثاني"
+android:textSize="16sp"
+android:textStyle="bold"
+android:textColor="#000000" />
+</LinearLayout>
+
+</LinearLayout>
+</ScrollView>
+</LinearLayout>

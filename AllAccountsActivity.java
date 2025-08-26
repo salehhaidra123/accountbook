@@ -2,96 +2,76 @@ package com.my.myapp;
 
 import android.Manifest;
 import android.content.ActivityNotFoundException;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.ContextMenu;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.textfield.TextInputEditText;
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Chunk;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.FontFactory;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.Rectangle;
 import com.itextpdf.text.pdf.BaseFont;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+import com.itextpdf.text.pdf.draw.LineSeparator;
 import com.my.myapp.DeleteAccountDialogFragment;
+import com.my.myapp.EditAccountDialogFragment;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.view.ActionMode;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
-import android.content.ContentValues;
-import android.net.Uri;
-import android.provider.MediaStore;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.BaseColor;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.OutputStream;
-import java.io.IOException;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Build;
-import android.os.Environment;
-import android.widget.Toast;
-import androidx.core.content.FileProvider;
-import com.itextpdf.text.*;
-import com.itextpdf.text.pdf.*;
-import java.io.*;
 
-import com.itextpdf.text.Document;
-import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.Element;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.FontFactory;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Chunk;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
-import com.itextpdf.text.pdf.draw.LineSeparator;
-import com.google.android.material.textfield.TextInputEditText;
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Chunk;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.Element;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.FontFactory;
-import com.itextpdf.text.Font;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
-import com.itextpdf.text.pdf.draw.LineSeparator;
+public class AllAccountsActivity extends AppCompatActivity
+		implements DeleteAccountDialogFragment.OnDeleteConfirmedListener,
+		EditAccountDialogFragment.OnAccountEditedListener, AddNewAccountDialogFragment.OnAccountAddedListener {
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-
-public class AllAccountsActivity extends AppCompatActivity implements
-		DeleteAccountDialogFragment.OnDeleteConfirmedListener, EditAccountDialogFragment.OnAccountEditedListener {
 	TextView tvId, tvName, tvBalance;
 	ListView listView;
 	Toolbar toolbar;
 	Button btnExportToPdf;
+	FloatingActionButton fabAddNewaAcc;
 	AllAccountsAdapter adapter;
 	DatabaseHelper dbHelper;
 	ArrayList<Account> accountList;
 	String selectedAccType;
 	private ActionMode actionMode;
 	private int selectedItemPosition = -1;
-
 	private static final int REQUEST_PERMISSION = 123;
 
 	@Override
@@ -102,17 +82,21 @@ public class AllAccountsActivity extends AppCompatActivity implements
 		toolbar = findViewById(R.id.toolbar);
 		setSupportActionBar(toolbar);
 		setTitle("قائمة الحسابات");
+		
+		
 
 		btnExportToPdf = findViewById(R.id.btn_export_pdf);
 		listView = findViewById(R.id.list_view_all_accounts);
-
 		dbHelper = new DatabaseHelper(getBaseContext());
 		accountList = dbHelper.getAllAccounts();
-		adapter = new AllAccountsAdapter(getBaseContext(), accountList);
+		adapter = new AllAccountsAdapter(getBaseContext(), accountList, listView);
 		listView.setAdapter(adapter);
+		listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
+
 		listView.setOnItemLongClickListener((parent, view, position, id) -> {
 			if (actionMode == null) {
 				Account selectedAccount = accountList.get(position);
+				listView.setItemChecked(position, true);
 				selectedItemPosition = position;
 				actionMode = startSupportActionMode(actionModeCallback);
 			}
@@ -124,40 +108,52 @@ public class AllAccountsActivity extends AppCompatActivity implements
 				createPdfAndOpen();
 			}
 		});
-	}
 
-	// باقي الكود كما هو (loadAccountList, onCreateContextMenu, onContextItemSelected, showDeleteAccountDialog, showEditAccountDialog)
+		fabAddNewaAcc = findViewById(R.id.fab_add_account);
+		fabAddNewaAcc.setOnClickListener(v -> {
+			AddNewAccountDialogFragment fragment = AddNewAccountDialogFragment.newInstance(true);
+			fragment.show(getSupportFragmentManager(), "AddAccount");
+		});
+	}
 
 	public void loadAccountList() {
 		accountList = dbHelper.getAllAccounts();
-		adapter = new AllAccountsAdapter(this, accountList);
+		adapter = new AllAccountsAdapter(this, accountList, listView);
 		listView.setAdapter(adapter);
 	}
 
-	// bring delete account dialog
 	private void showDeleteAccountDialog(int accountId) {
 		DeleteAccountDialogFragment dialog = DeleteAccountDialogFragment.newInstance(accountId);
 		dialog.show(getSupportFragmentManager(), "DeleteDialog");
 	}
 
-	// bring edit account dialog
 	public void showEditAccountDialog(Account account) {
 		EditAccountDialogFragment dialog = EditAccountDialogFragment.newInstance(account);
 		dialog.show(getSupportFragmentManager(), "EditAccountDialog");
 	}
 
-	// edit account listener
 	@Override
 	public void onAccountEdited() {
-		loadAccountList(); // ✅ يتم تحديث القائمة عند التعديل
+		loadAccountList();
+		listView.clearChoices();
+		//	((BaseAdapter) listView.getAdapter()).notifyDataSetChanged(); //
+		adapter.notifyDataSetChanged();
 	}
 
-	//delete account listener
 	@Override
 	public void onAccountDeleteConfirmed(int accountId) {
 		dbHelper.deleteAccountById(accountId);
-		loadAccountList(); // تحديث القائمة
+		loadAccountList();
 	}
+	/*@Override
+	public void onBackPressed() {
+		if (listView.getCheckedItemPosition() != ListView.INVALID_POSITION) {
+			listView.clearChoices();
+			adapter.notifyDataSetChanged();
+			} else {
+			super.onBackPressed();
+		}
+	}*/
 
 	private final ActionMode.Callback actionModeCallback = new ActionMode.Callback() {
 		@Override
@@ -179,13 +175,11 @@ public class AllAccountsActivity extends AppCompatActivity implements
 				showEditAccountDialog(accToEdit);
 				mode.finish();
 				return true;
-
 			case R.id.menu_delete:
 				Account accToDelete = accountList.get(selectedItemPosition);
 				showDeleteAccountDialog(accToDelete.getAccountId());
 				mode.finish();
 				return true;
-
 			default:
 				return false;
 			}
@@ -195,6 +189,8 @@ public class AllAccountsActivity extends AppCompatActivity implements
 		public void onDestroyActionMode(ActionMode mode) {
 			actionMode = null;
 			selectedItemPosition = -1;
+			listView.clearChoices();
+			adapter.notifyDataSetChanged();
 		}
 	};
 
@@ -214,71 +210,95 @@ public class AllAccountsActivity extends AppCompatActivity implements
 	}
 
 	private void createPdfAndOpen() {
-		Document document = new Document();
-
-		String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-				+ "/AccountsList.pdf";
-
-		File pdfFile = new File(filePath);
+		String fileName = "AccountsList_" + System.currentTimeMillis() + ".pdf";
+		OutputStream outputStream = null;
+		Uri uri = null;
 
 		try {
-			PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(pdfFile));
+			// إنشاء الملف باستخدام MediaStore API
+			ContentValues values = new ContentValues();
+			values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+			values.put(MediaStore.Downloads.MIME_TYPE, "application/pdf");
+			values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+			uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+			if (uri == null) {
+				Toast.makeText(this, "فشل في إنشاء ملف PDF", Toast.LENGTH_SHORT).show();
+				return;
+			}
+
+			outputStream = getContentResolver().openOutputStream(uri);
+			if (outputStream == null) {
+				Toast.makeText(this, "فشل في فتح دفق الإخراج", Toast.LENGTH_SHORT).show();
+				return;
+			}
+
+			// إنشاء مستند PDF
+			Document document = new Document();
+			PdfWriter writer = PdfWriter.getInstance(document, outputStream);
 			document.open();
 
-			// تحميل الخط العربي من assets/fonts/Amiri-Regular.ttf
-			File fontFile = copyFontFromAssets("Amiri-Regular.ttf"); // يجب أن تنشئ هذه الدالة لنسخ الخط من assets إلى مسار يمكن قراءته
+			// تحميل الخط العربي
+			File fontFile = copyFontFromAssets("Amiri-Regular.ttf");
 			BaseFont baseFont = BaseFont.createFont(fontFile.getAbsolutePath(), BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
-
 			Font fontArabicHeader = new Font(baseFont, 16, Font.BOLD);
 			Font fontArabicTableHeader = new Font(baseFont, 14, Font.BOLD);
 			Font fontArabicTableCell = new Font(baseFont, 12, Font.NORMAL);
 
+			// إنشاء جدول الترويسة
 			// إنشاء جدول الترويسة 3 أعمدة
 			PdfPTable headerTable = new PdfPTable(3);
 			headerTable.setWidthPercentage(100);
 			headerTable.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
-			headerTable.setWidths(new float[] { 1f, 1f, 1f });
+			headerTable.setWidths(new float[] { 3f, 1f, 1f }); // العمود الأول أعرض لاحتواء النصوص
 
-			// خلايا العمود الأول والثاني فارغة بدون حدود
-			PdfPCell emptyCell1 = new PdfPCell(new Phrase(""));
-			emptyCell1.setBorder(Rectangle.NO_BORDER);
-			PdfPCell emptyCell2 = new PdfPCell(new Phrase(""));
-			emptyCell2.setBorder(Rectangle.NO_BORDER);
+			// العمود الأول (النصوص الرئيسية)
+			PdfPCell textColumn = new PdfPCell();
+			textColumn.setBorder(Rectangle.NO_BORDER);
+			textColumn.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
 
-			// سطر 1 في العمود الأيمن
-			PdfPCell cell1 = new PdfPCell(new Phrase("الجمهورية اليمنية", fontArabicHeader));
-			cell1.setHorizontalAlignment(Element.ALIGN_RIGHT);
-			cell1.setBorder(Rectangle.NO_BORDER);
+			// إضافة النصوص في العمود الأول مع محاذاة كاملة لليمين
+			Paragraph p1 = new Paragraph("الجمهورية اليمنية", fontArabicHeader);
+			p1.setAlignment(Element.ALIGN_RIGHT);
+			p1.setSpacingAfter(5f); // مسافة بين السطور
+			textColumn.addElement(p1);
 
-			// سطر 2 في العمود الأيمن
-			PdfPCell cell2 = new PdfPCell(new Phrase("تطبيق دفتر الحسابات", fontArabicHeader));
-			cell2.setHorizontalAlignment(Element.ALIGN_RIGHT);
-			cell2.setBorder(Rectangle.NO_BORDER);
+			Paragraph p2 = new Paragraph(" دفتر الحسابات", fontArabicHeader);
+			p2.setAlignment(Element.ALIGN_RIGHT);
+			p2.setSpacingAfter(5f);
+			textColumn.addElement(p2);
 
-			// سطر 3 في العمود الأيمن
-			PdfPCell cell3 = new PdfPCell(new Phrase("تقرير الحسابات", fontArabicHeader));
-			cell3.setHorizontalAlignment(Element.ALIGN_RIGHT);
-			cell3.setBorder(Rectangle.NO_BORDER);
+			Paragraph p3 = new Paragraph("تقرير الحسابات", fontArabicHeader);
+			p3.setAlignment(Element.ALIGN_RIGHT);
+			textColumn.addElement(p3);
 
-			// إضافة الصف الأول (خلايا عمود 1 و2 فارغة، وعمود 3 النص)
-			headerTable.addCell(cell1);
-			headerTable.addCell(emptyCell2);
-			headerTable.addCell(emptyCell1);
+			headerTable.addCell(textColumn);
 
-			// إضافة الصف الثاني
-			headerTable.addCell(cell2);
-			headerTable.addCell(emptyCell2);
-			headerTable.addCell(emptyCell1);
+			// العمود الثاني (محجوز للشعار مستقبلاً)
+			PdfPCell logoColumn = new PdfPCell();
+			logoColumn.setBorder(Rectangle.NO_BORDER);
+			logoColumn.setHorizontalAlignment(Element.ALIGN_CENTER);
+			logoColumn.setVerticalAlignment(Element.ALIGN_MIDDLE);
+			// مستقبلاً يمكنك إضافة:
+			// Image logo = Image.getInstance(logoPath);
+			// logo.scaleToFit(50, 50);
+			// logoColumn.addElement(logo);
+			headerTable.addCell(logoColumn);
 
-			// إضافة الصف الثالث
-			headerTable.addCell(cell3);
-			headerTable.addCell(emptyCell2);
-			headerTable.addCell(emptyCell1);
-		
+			// العمود الثالث (محجوز للتاريخ أو معلومات أخرى)
+			PdfPCell infoColumn = new PdfPCell();
+			infoColumn.setBorder(Rectangle.NO_BORDER);
+			infoColumn.setHorizontalAlignment(Element.ALIGN_LEFT);
+			infoColumn.setVerticalAlignment(Element.ALIGN_TOP);
+			// مستقبلاً يمكنك إضافة:
+			// Paragraph datePara = new Paragraph(new SimpleDateFormat("yyyy/MM/dd").format(new Date()), fontArabicTableCell);
+			// datePara.setAlignment(Element.ALIGN_LEFT);
+			// infoColumn.addElement(datePara);
+			headerTable.addCell(infoColumn);
+
 			headerTable.setSpacingAfter(20f);
 			document.add(headerTable);
-			//	document.add(headerTable);
-				
+
 			// إضافة خط فاصل
 			LineSeparator line = new LineSeparator();
 			line.setLineColor(BaseColor.BLACK);
@@ -286,12 +306,10 @@ public class AllAccountsActivity extends AppCompatActivity implements
 			document.add(new Chunk(line));
 			document.add(Chunk.NEWLINE);
 
-
 			// إعداد جدول البيانات
 			PdfPTable table = new PdfPTable(4);
 			table.setWidthPercentage(100);
 			table.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
-
 			String[] headers = { "المعرف", "تاريخ الإنشاء", "الاسم", "الهاتف" };
 			BaseColor headerBgColor = new BaseColor(230, 230, 230);
 
@@ -303,7 +321,7 @@ public class AllAccountsActivity extends AppCompatActivity implements
 				table.addCell(cell);
 			}
 
-			// افترض أن accountList موجودة ومليئة بالبيانات
+			// إضافة البيانات
 			for (Account acc : accountList) {
 				PdfPCell idCell = new PdfPCell(new Phrase(String.valueOf(acc.getAccountId()), fontArabicTableCell));
 				idCell.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -332,19 +350,28 @@ public class AllAccountsActivity extends AppCompatActivity implements
 
 			document.add(table);
 			document.close();
+			outputStream.close();
 
-			Toast.makeText(this, "تم إنشاء ملف PDF في: " + filePath, Toast.LENGTH_LONG).show();
-			openPdfFile(pdfFile);
+			Toast.makeText(this, "تم حفظ ملف PDF بنجاح", Toast.LENGTH_LONG).show();
+
+			// فتح الملف
+			openPdfFile(uri);
 
 		} catch (DocumentException | IOException e) {
 			e.printStackTrace();
 			Toast.makeText(this, "حدث خطأ أثناء إنشاء PDF: " + e.getMessage(), Toast.LENGTH_LONG).show();
+		} finally {
+			if (outputStream != null) {
+				try {
+					outputStream.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 
-	private void openPdfFile(File file) {
-		Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
-
+	private void openPdfFile(Uri uri) {
 		Intent intent = new Intent(Intent.ACTION_VIEW);
 		intent.setDataAndType(uri, "application/pdf");
 		intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
@@ -352,22 +379,27 @@ public class AllAccountsActivity extends AppCompatActivity implements
 
 		try {
 			startActivity(intent);
-		} catch (android.content.ActivityNotFoundException e) {
+		} catch (ActivityNotFoundException e) {
 			Toast.makeText(this, "لا يوجد تطبيق مثبت لعرض ملفات PDF", Toast.LENGTH_SHORT).show();
 		}
 	}
 
 	private boolean checkPermissions() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-			if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-				return true;
+		// في Android 10+، لا نحتاج إلى صلاحية WRITE_EXTERNAL_STORAGE
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+				if (checkSelfPermission(
+						Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+					return true;
+				} else {
+					requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, REQUEST_PERMISSION);
+					return false;
+				}
 			} else {
-				requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, REQUEST_PERMISSION);
-				return false;
+				return true;
 			}
-		} else {
-			return true;
 		}
+		return true;
 	}
 
 	@Override
@@ -380,5 +412,10 @@ public class AllAccountsActivity extends AppCompatActivity implements
 				Toast.makeText(this, "الصلاحيات مطلوبة لحفظ الملف", Toast.LENGTH_SHORT).show();
 			}
 		}
+	}
+
+	@Override
+	public void onAccountAdded(String name, String phone, String date) {
+		loadAccountList();
 	}
 }

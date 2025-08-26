@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -14,6 +15,7 @@ public class AccountsDashboardActivity extends AppCompatActivity {
 	Toolbar toolbar;
 	LinearLayout layoutAccounts, layoutAccountType, layoutAccountGroup, layoutConstraintType;
 	TextView tvAccounts;
+	ImageButton btnBack;
 	//	ImageView ivAccounts;
 	//	Button btnShowAllAccounts , btnCategories ;
 
@@ -30,6 +32,7 @@ public class AccountsDashboardActivity extends AppCompatActivity {
 		layoutAccountType = findViewById(R.id.layout_account_type);
 		layoutAccountGroup = findViewById(R.id.layout_account_group);
 		layoutConstraintType = findViewById(R.id.layout_constraint_type);
+		btnBack = findViewById(R.id.btn_back);
 
 		tvAccounts = findViewById(R.id.tv_accounts_home);
 		layoutAccounts.setOnClickListener(new View.OnClickListener() {
@@ -40,6 +43,9 @@ public class AccountsDashboardActivity extends AppCompatActivity {
 				startActivity(intent);
 			}
 
+		});
+		btnBack.setOnClickListener(v -> {
+			onBackPressed();
 		});
 
 		layoutAccountType.setOnClickListener(v -> {

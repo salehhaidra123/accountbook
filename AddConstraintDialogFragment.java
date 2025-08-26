@@ -37,7 +37,6 @@ public class AddConstraintDialogFragment extends DialogFragment {
 	ArrayAdapter<String> constraintTypeAdapter;
 	Map<String, Integer> typeNameToIdMap = new HashMap<>();
 
-	
 	public static AddConstraintDialogFragment newInstance(int accountId) {
 		AddConstraintDialogFragment fragment = new AddConstraintDialogFragment();
 		Bundle args = new Bundle();
@@ -45,7 +44,7 @@ public class AddConstraintDialogFragment extends DialogFragment {
 		fragment.setArguments(args);
 		return fragment;
 	}
-	
+
 	public interface OnConstraintAddedListener {
 		void onConstraintAdded();
 	}
@@ -74,10 +73,10 @@ public class AddConstraintDialogFragment extends DialogFragment {
 
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-	@Nullable Bundle savedInstanceState) {
-		
+			@Nullable Bundle savedInstanceState) {
+
 		View view = inflater.inflate(R.layout.fragment_edit_constraint_dialog, container, false);
-		
+
 		editTextDate = view.findViewById(R.id.edit_text_date);
 		editTextDetails = view.findViewById(R.id.edit_text_details);
 		editTextDebit = view.findViewById(R.id.edit_text_debit);
@@ -85,48 +84,46 @@ public class AddConstraintDialogFragment extends DialogFragment {
 		autoConstraintType = view.findViewById(R.id.auto_complete_constraint_type);
 		Button btnSave = view.findViewById(R.id.btn_edit_constraint);
 		Button btnCancel = view.findViewById(R.id.btn_cancel);
-		
+
 		dbHelper = new DatabaseHelper(getContext());
-		
+
 		// تحميل أنواع القيود وربطها بالـ AutoCompleteTextView
 		constraintTypeList = dbHelper.getAllConstraintTypes();
 		List<String> typeNames = new ArrayList<>();
 		typeNameToIdMap = new HashMap<>();
-		
+
 		for (ConstraintType type : constraintTypeList) {
 			typeNames.add(type.getConstraintTypeName());
 			typeNameToIdMap.put(type.getConstraintTypeName(), type.getConstraintTypeId());
 		}
-		
-		constraintTypeAdapter = new ArrayAdapter<>(
-		getContext(),
-		android.R.layout.simple_dropdown_item_1line,
-		typeNames
-		);
+
+		constraintTypeAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_dropdown_item_1line,
+				typeNames);
 		autoConstraintType.setAdapter(constraintTypeAdapter);
+		autoConstraintType.setText(typeNames.get(0), false);
 		autoConstraintType.setOnClickListener(v -> autoConstraintType.showDropDown());
-		
+
 		// اختيار النوع الأول افتراضياً
-	/*	if (!typeNames.isEmpty()) {
-			autoConstraintType.setText(typeNames.get(0), false);
-		}*/
-		
+		/*	if (!typeNames.isEmpty()) {
+				autoConstraintType.setText(typeNames.get(0), false);
+			}*/
+
 		// استلام معرف الحساب من الـ arguments
 		if (getArguments() != null) {
 			accountId = getArguments().getInt("account_id", -1);
 		}
-		
+
 		// إعداد التاريخ الحالي
 		final Calendar calendar = Calendar.getInstance();
 		final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
-		
+
 		if (initialDate != null) {
 			editTextDate.setText(initialDate);
-			} else {
+		} else {
 			todayDate = sdf.format(calendar.getTime());
 			editTextDate.setText(todayDate);
 		}
-		
+
 		editTextDate.setOnClickListener(v -> {
 			DatePickerDialog datePickerDialog = new DatePickerDialog(getContext(), (view1, year, month, dayOfMonth) -> {
 				calendar.set(year, month, dayOfMonth);
@@ -138,61 +135,63 @@ public class AddConstraintDialogFragment extends DialogFragment {
 			}, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
 			datePickerDialog.show();
 		});
-		
+
 		// زر الإلغاء
 		btnCancel.setOnClickListener(v -> dismiss());
-		
+
 		// زر الحفظ
 		btnSave.setOnClickListener(v -> {
 			String date = editTextDate.getText().toString().trim();
 			String details = editTextDetails.getText().toString().trim();
 			String debitStr = editTextDebit.getText().toString().trim();
 			String creditStr = editTextCredit.getText().toString().trim();
-			
+
 			// الحصول على نوع القيد المختار
 			String selectedTypeName = autoConstraintType.getText().toString().trim();
-			int selectedTypeId = typeNameToIdMap.containsKey(selectedTypeName) ?
-			typeNameToIdMap.get(selectedTypeName) : -1;
+			int selectedTypeId = typeNameToIdMap.containsKey(selectedTypeName) ? typeNameToIdMap.get(selectedTypeName)
+					: -1;
 			Log.d("نوع_القيد", "المختار: " + selectedTypeName + ", id: " + selectedTypeId);
 			double debit = debitStr.isEmpty() ? 0 : Double.parseDouble(debitStr);
 			double credit = creditStr.isEmpty() ? 0 : Double.parseDouble(creditStr);
-			
+
 			// التحقق من البيانات
 			if (details.isEmpty()) {
 				editTextDetails.setError("البيان مطلوب");
 				return;
 			}
-			
+
 			if ((debit > 0 && credit > 0) || (debit == 0 && credit == 0)) {
 				Toast.makeText(getContext(), "أدخل مبلغ في المدين أو الدائن فقط", Toast.LENGTH_SHORT).show();
 				return;
 			}
-			
+
 			if (selectedTypeId == -1) {
 				Toast.makeText(getContext(), "اختر نوع القيد", Toast.LENGTH_SHORT).show();
 				return;
 			}
-			Constraint constraint = new Constraint();
+		/*	Constraint constraint = new Constraint();
 			constraint.setAccountId(accountId);
 			constraint.setDate(date);
 			constraint.setDetails(details);
 			constraint.setDebit(debit);
 			constraint.setCredit(credit);
 			constraint.setConstraintTypeId(selectedTypeId);
-			Log.d("نوع_القيد", "المختار: " + selectedTypeName + ", id: " + selectedTypeId);
+			Log.d("نوع_القيد", "المختار: " + selectedTypeName + ", id: " + selectedTypeId);*/
 			// الإدخال في قاعدة البيانات
-			boolean success = dbHelper.insertConstraintV2(constraint);
+			// الإدخال في قاعدة البيانات
+			boolean success = dbHelper.insertConstraint(accountId, date, details, debit, credit, selectedTypeId // إضافة معرّف نوع القيد
+			);
 			if (success) {
 				Toast.makeText(getContext(), "✅ تم إضافة القيد بنجاح", Toast.LENGTH_SHORT).show();
 				if (listener != null) {
 					listener.onConstraintAdded();
 				}
 				dismiss();
-				} else {
+			} else {
 				Toast.makeText(getContext(), "❌ فشل في إضافة القيد", Toast.LENGTH_SHORT).show();
 			}
 		});
-		
+
 		return view;
 	}
 

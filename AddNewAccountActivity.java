@@ -1,5 +1,7 @@
 package com.my.myapp;
 
+import android.graphics.Typeface;
+import androidx.core.content.res.ResourcesCompat;
 import com.my.myapp.Account;
 import android.app.DatePickerDialog;
 import android.os.Bundle;
@@ -46,7 +48,10 @@ public class AddNewAccountActivity extends AppCompatActivity {
 		etName = findViewById(R.id.et_account_name);
 		etName.requestFocus();
 		getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-
+		
+		Typeface robotoMedium = Typeface.createFromAsset(getAssets(), "fonts/Rakkas-Regular.ttf");
+		etName.setTypeface(robotoMedium);
+		
 		etDate = findViewById(R.id.et_account_date);
 		String currentDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
 		etDate.setText(currentDate);

@@ -3,6 +3,7 @@ package com.my.myapp;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.*;
 import android.widget.ArrayAdapter;
@@ -47,7 +48,11 @@ public class AddNewAccountDialogFragment extends DialogFragment {
 		return fragment;
 	}
 	
+	
+//		etName.setTypeface(robotoMedium);
+	
 	// ربط الـ Listener وتهيئة قاعدة البيانات
+	//conect listener and intilize database
 	@Override
 	public void onAttach(@NonNull Context context) {
 		super.onAttach(context);
@@ -88,8 +93,10 @@ public class AddNewAccountDialogFragment extends DialogFragment {
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
 	@Nullable Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.fragment_add_new_account, container, false);
+		Typeface robotoMedium = Typeface.createFromAsset(requireContext().getAssets(), "fonts/Rakkas-Regular.ttf");
 		
 		etAccountName = view.findViewById(R.id.et_account_name);
+		etAccountName.setTypeface(robotoMedium);
 		etAccountPhone = view.findViewById(R.id.et_account_phone);
 		etAccountDate = view.findViewById(R.id.et_account_date);
 		

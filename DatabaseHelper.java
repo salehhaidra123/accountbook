@@ -166,36 +166,46 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return result > 0;
 	}
 
-	//======================== CONSTRAINTS TABLE ================================================
-
-	public boolean insertConstraint(int accountId, String date, String details, double debit, double credit) {
+	public boolean updateAccountV2(int id, int accountTypeId, int accountGroupId, String name, String accountPhone) {
 		SQLiteDatabase db = this.getWritableDatabase();
 		ContentValues values = new ContentValues();
+		values.put(DBConstants.COL_ACCOUNT_TYPE, accountTypeId); // استخدام معرف نوع الحساب
+		values.put(DBConstants.COL_ACCOUNT_GROUP, accountGroupId); // استخدام معرف مجموعة الحساب
+		values.put(DBConstants.COL_ACCOUNT_NAME, name);
+		values.put(DBConstants.COL_ACCOUNT_PHONE, accountPhone);
+		int result = db.update(DBConstants.TABLE_ACCOUNTS, values, DBConstants.COL_ACCOUNT_ID + "=?",
+				new String[] { String.valueOf(id) });
+		return result > 0;
+	}
 
+	//======================== CONSTRAINTS TABLE ================================================
+
+	public boolean insertConstraint(int accountId, String date, String details, double debit, double credit,
+			int constraintTypeId) {
+		SQLiteDatabase db = this.getWritableDatabase();
+		ContentValues values = new ContentValues();
 		values.put(DBConstants.COL_CONST_ACCOUNT_ID, accountId);
 		values.put(DBConstants.COL_CONST_DATE, date);
 		values.put(DBConstants.COL_CONST_DETAILS, details);
 		values.put(DBConstants.COL_CONST_DEBIT, debit);
 		values.put(DBConstants.COL_CONST_CREDIT, credit);
-
+		values.put(DBConstants.COL_CONST_TYPE, constraintTypeId); // إضافة حقل نوع القيد
 		long result = db.insert(DBConstants.TABLE_CONSTRIANTS, null, values);
 		db.close();
-
 		return result != -1;
 	}
 
-	public boolean updateConstraint(int constraintId, String date, String details, double debit, double credit) {
+	public boolean updateConstraint(int constraintId, String date, String details, double debit, double credit,
+			int constraintTypeId) {
 		SQLiteDatabase db = this.getWritableDatabase();
 		ContentValues values = new ContentValues();
-
 		values.put(DBConstants.COL_CONST_DATE, date);
 		values.put(DBConstants.COL_CONST_DETAILS, details);
 		values.put(DBConstants.COL_CONST_DEBIT, debit);
 		values.put(DBConstants.COL_CONST_CREDIT, credit);
-
+		values.put(DBConstants.COL_CONST_TYPE, constraintTypeId); // إضافة حقل نوع القيد
 		int result = db.update(DBConstants.TABLE_CONSTRIANTS, values, DBConstants.COL_CONST_ID + " = ?",
 				new String[] { String.valueOf(constraintId) });
-
 		db.close();
 		return result > 0;
 	}
@@ -228,12 +238,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 	public ArrayList<Constraint> getAllConstraintsByAccountId(int accountId) {
 		ArrayList<Constraint> list = new ArrayList<>();
 		SQLiteDatabase db = this.getReadableDatabase();
-		
-		Cursor cursor = db.rawQuery(
-		"SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?",
-		new String[]{String.valueOf(accountId)}
-		);
-		
+
+		Cursor cursor = db.rawQuery("SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE "
+				+ DBConstants.COL_CONST_ACCOUNT_ID + " = ?", new String[] { String.valueOf(accountId) });
+
 		if (cursor.moveToFirst()) {
 			do {
 				int constId = cursor.getInt(cursor.getColumnIndexOrThrow(DBConstants.COL_CONST_ID));
@@ -243,19 +251,21 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 				String details = cursor.getString(cursor.getColumnIndexOrThrow(DBConstants.COL_CONST_DETAILS));
 				double debit = cursor.getDouble(cursor.getColumnIndexOrThrow(DBConstants.COL_CONST_DEBIT));
 				double credit = cursor.getDouble(cursor.getColumnIndexOrThrow(DBConstants.COL_CONST_CREDIT));
-				
+
 				// إنشاء كائن Constraint كامل
-				Constraint constraint = new Constraint(constId, constAccountId, constraintTypeId, date, details, debit, credit);
+				Constraint constraint = new Constraint(constId, constAccountId, constraintTypeId, date, details, debit,
+						credit);
 				list.add(constraint);
-				
+
 			} while (cursor.moveToNext());
 		}
-		
+
 		cursor.close();
 		db.close();
-		
+
 		return list;
 	}
+
 	public String getAccountTypeById(int accountId) {
 		SQLiteDatabase db = this.getReadableDatabase();
 		String accountType = "";
@@ -343,60 +353,138 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 		return balance;
 	}
 
-/*	public boolean deleteConstraint(int id) {
-		Log.d("DB_DEBUG", "Trying to delete constraint with ID: " + id);
+	public double getTotalDebitByDate(int accountId, String fromDate, String toDate) {
+		double totalDebit = 0;
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		// القاعدة الأساسية
+		String query = "SELECT SUM(" + DBConstants.COL_CONST_DEBIT + ") FROM " + DBConstants.TABLE_CONSTRIANTS
+				+ " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?";
+
+		List<String> args = new ArrayList<>();
+		args.add(String.valueOf(accountId));
+
+		// إذا التواريخ مش فارغة نضيف شرط الفلترة
+		if (fromDate != null && !fromDate.isEmpty() && toDate != null && !toDate.isEmpty()) {
+			query += " AND " + DBConstants.COL_CONST_DATE + " BETWEEN ? AND ?";
+			args.add(fromDate);
+			args.add(toDate);
+		}
+
+		Cursor cursor = db.rawQuery(query, args.toArray(new String[0]));
+		if (cursor.moveToFirst()) {
+			totalDebit = cursor.getDouble(0);
+		}
+
+		cursor.close();
+		db.close();
+		return totalDebit;
+	}
+
+	public double getTotalCreditByDate(int accountId, String fromDate, String toDate) {
+		double totalCredit = 0;
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String query = "SELECT SUM(" + DBConstants.COL_CONST_CREDIT + ") FROM " + DBConstants.TABLE_CONSTRIANTS
+				+ " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?";
+
+		List<String> args = new ArrayList<>();
+		args.add(String.valueOf(accountId));
+
+		if (fromDate != null && !fromDate.isEmpty() && toDate != null && !toDate.isEmpty()) {
+			query += " AND " + DBConstants.COL_CONST_DATE + " BETWEEN ? AND ?";
+			args.add(fromDate);
+			args.add(toDate);
+		}
+
+		Cursor cursor = db.rawQuery(query, args.toArray(new String[0]));
+		if (cursor.moveToFirst()) {
+			totalCredit = cursor.getDouble(0);
+		}
+
+		cursor.close();
+		db.close();
+		return totalCredit;
+	}
+
+	public double getAccountBalanceByDate(int accountId, String accountType, String fromDate, String toDate) {
+		double totalDebit = getTotalDebitByDate(accountId, fromDate, toDate);
+		double totalCredit = getTotalCreditByDate(accountId, fromDate, toDate);
+		double balance;
+		if ("صندوق".equals(accountType) || "مدين".equals(accountType)) {
+			balance = totalDebit - totalCredit;
+		} else if ("دائن".equals(accountType)) {
+			balance = totalCredit - totalDebit;
+		} else {
+			// Default behavior if type is unknown
+			balance = totalDebit - totalCredit;
+		}
+		return balance;
+	}
+
+	public Cursor getConstraintsByDateAndAccount(String fromDate, String toDate, int accountId) {
+		SQLiteDatabase db = this.getReadableDatabase();
+
+		String query = "SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID
+				+ " = ? " + " AND " + DBConstants.COL_CONST_DATE + " >= ? " + " AND " + DBConstants.COL_CONST_DATE
+				+ " <= ?" + " ORDER BY " + DBConstants.COL_CONST_DATE + " ASC"; // ترتيب حسب التاريخ
+
+		String[] args = { String.valueOf(accountId), fromDate, toDate };
+
+		return db.rawQuery(query, args);
+	}
+
+	/*	public boolean deleteConstraint(int id) {
+			Log.d("DB_DEBUG", "Trying to delete constraint with ID: " + id);
+			SQLiteDatabase db = this.getWritableDatabase();
+			int result = db.delete(DBConstants.TABLE_CONSTRIANTS, DBConstants.COL_CONST_ID + " = ?",
+					new String[] { String.valueOf(id) });
+			Log.d("DB_DEBUG", "Rows deleted: " + result);
+			db.close();
+			return result > 0;
+		}*/
+	public boolean deleteConstraint(int id) {
+		if (id <= 0) {
+			Log.e("DB_DELETE", "Invalid constraint ID: " + id);
+			return false;
+		}
+
 		SQLiteDatabase db = this.getWritableDatabase();
 		int result = db.delete(DBConstants.TABLE_CONSTRIANTS, DBConstants.COL_CONST_ID + " = ?",
 				new String[] { String.valueOf(id) });
-		Log.d("DB_DEBUG", "Rows deleted: " + result);
+
+		Log.d("DB_DELETE", "Deleted constraint ID: " + id + ", rows affected: " + result);
 		db.close();
+
 		return result > 0;
-	}*/
-	public boolean deleteConstraint(int id) {
-    if (id <= 0) {
-        Log.e("DB_DELETE", "Invalid constraint ID: " + id);
-        return false;
-    }
+	}
 
-    SQLiteDatabase db = this.getWritableDatabase();
-    int result = db.delete(
-            DBConstants.TABLE_CONSTRIANTS,
-            DBConstants.COL_CONST_ID + " = ?",
-            new String[]{String.valueOf(id)}
-    );
-
-    Log.d("DB_DELETE", "Deleted constraint ID: " + id + ", rows affected: " + result);
-    db.close();
-
-    return result > 0;
-}
+	/*	public boolean deleteConstraint(int constraintId) {
+	Log.d("DB_DELETE", "Attempting to delete constraint with ID: " + constraintId);
 	
-/*	public boolean deleteConstraint(int constraintId) {
-    Log.d("DB_DELETE", "Attempting to delete constraint with ID: " + constraintId);
-
-    if (constraintId <= 0) {
-        Log.e("DB_DELETE", "Invalid constraintId: " + constraintId);
-        return false;
-    }
-
-    SQLiteDatabase db = this.getWritableDatabase();
-    int rowsDeleted = 0;
-
-    try {
-        rowsDeleted = db.delete(
-                DBConstants.TABLE_CONSTRIANTS,
-                DBConstants.COL_CONST_ID + " = ?",
-                new String[]{String.valueOf(constraintId)}
-        );
-        Log.d("DB_DELETE", "Rows heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer deleted: " + rowsDeleted);
-    } catch (Exception e) {
-        Log.e("DB_DELETE", "Error heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer deleting constraint", e);
-    } finally {
-        db.close();
-    }
-
-    return rowsDeleted > 0;
-}*/
+	if (constraintId <= 0) {
+	    Log.e("DB_DELETE", "Invalid constraintId: " + constraintId);
+	    return false;
+	}
+	
+	SQLiteDatabase db = this.getWritableDatabase();
+	int rowsDeleted = 0;
+	
+	try {
+	    rowsDeleted = db.delete(
+	            DBConstants.TABLE_CONSTRIANTS,
+	            DBConstants.COL_CONST_ID + " = ?",
+	            new String[]{String.valueOf(constraintId)}
+	    );
+	    Log.d("DB_DELETE", "Rows heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer deleted: " + rowsDeleted);
+	} catch (Exception e) {
+	    Log.e("DB_DELETE", "Error heeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeer deleting constraint", e);
+	} finally {
+	    db.close();
+	}
+	
+	return rowsDeleted > 0;
+	}*/
 
 	//======================== CONSTRAINTS TYPE TABLE ================================================
 	//=========================================================================================================

@@ -1,0 +1,651 @@
+package com.my.myapp;
+
+import android.app.DatePickerDialog;
+import android.app.Dialog;
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.WindowManager;
+import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
+import android.widget.Button;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.DialogFragment;
+import com.google.android.material.textfield.TextInputEditText;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Locale;
+
+public class EditExchangeFragment extends DialogFragment {
+	private static final String TAG = "EditExchangeFragment";
+
+	// Interface for communication with the Activity
+	public interface OnTransferCompleteListener {
+		void onTransferComplete();
+	}
+
+	// UI Components
+	private AutoCompleteTextView debitAccountSpinner, creditAccountSpinner, operationTypeSpinner;
+	private TextInputEditText descriptionEditText, amountEditText, dateEditText;
+	private Button actionButton, cancelButton;
+
+	// Data Components
+	private DatabaseHelper dbHelper;
+	private List<Account> accountsList;
+	private List<Account> debitAccountsList; // قائمة منفصلة لحسابات المدين
+	private List<Account> creditAccountsList; // قائمة منفصلة لحسابات الدائن
+	private ArrayAdapter<Account> debitAccountAdapter;
+	private ArrayAdapter<Account> creditAccountAdapter;
+	private List<ConstraintType> constraintTypes;
+	private ArrayAdapter<ConstraintType> constraintTypeAdapter;
+
+	// State Variables
+	private int debitAccountId = -1, creditAccountId = -1;
+	private int selectedConstraintTypeId = -1;
+	private int transferId = -1; // معرف التحويل للتعديل
+
+	// Listener for transfer completion
+	private OnTransferCompleteListener listener;
+
+	// Set the listener for transfer completion
+	public void setOnTransferCompleteListener(OnTransferCompleteListener listener) {
+		this.listener = listener;
+	}
+
+	@Override
+	public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+		View view = inflater.inflate(R.layout.fragment_exchange, container, false);
+
+		// Initialize components
+		initViews(view);
+
+		// Initialize database helper using singleton
+		dbHelper = DatabaseHelper.getInstance(requireContext());
+
+		// Set current date as default
+		setCurrentDate();
+
+		// Load data
+		loadAccounts();
+		loadConstraintTypes();
+
+		// Setup listeners
+		setupListeners();
+
+		// Setup UI
+		setupUI();
+
+		return view;
+	}
+
+	@Override
+	public void onStart() {
+		super.onStart();
+		Dialog dialog = getDialog();
+		// Make sure the Dialog exists
+		if (getDialog() != null && getDialog().getWindow() != null) {
+			int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.8); // 80% of screen width
+			int height = WindowManager.LayoutParams.WRAP_CONTENT; // Height based on content
+			dialog.getWindow().setLayout(width, height);
+			// If you want a rounded background as well
+			dialog.getWindow().setBackgroundDrawableResource(R.drawable.bg_dialog_rounded2);
+		}
+	}
+
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+		// Don't close dbHelper here since we're using singleton pattern
+	}
+
+	// Initialize UI components
+	private void initViews(View view) {
+		debitAccountSpinner = view.findViewById(R.id.debit_account_spinner);
+		creditAccountSpinner = view.findViewById(R.id.credit_account_spinner);
+		operationTypeSpinner = view.findViewById(R.id.operation_type_spinner);
+		descriptionEditText = view.findViewById(R.id.description_edit_text);
+		amountEditText = view.findViewById(R.id.amount_edit_text);
+		dateEditText = view.findViewById(R.id.date_edit_text);
+		actionButton = view.findViewById(R.id.transfer_button);
+		cancelButton = view.findViewById(R.id.cancel_button);
+
+		// Initially disable the action button
+		actionButton.setEnabled(false);
+	}
+	
+	@Override
+public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    super.onViewCreated(view, savedInstanceState);
+
+ //   EditText editText = view.findViewById(R.id.et_field_value);
+ amountEditText = view.findViewById(R.id.amount_edit_text);
+
+    // تأخير بسيط (نصف ثانية) لفتح الكيبورد بعد رسم الواجهة
+    amountEditText.postDelayed(() -> {
+        amountEditText.requestFocus();
+        InputMethodManager imm = (InputMethodManager) requireContext()
+                .getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(amountEditText, InputMethodManager.SHOW_IMPLICIT);
+        }
+    }, 100); // 500 ملي ثانية
+}
+
+	// Setup UI for edit mode
+	private void setupUI() {
+		// إعدادات واجهة المستخدم الخاصة بالتعديل
+		actionButton.setText("تحديث");
+		loadCurrentData();
+	}
+
+	// Load current data for edit mode
+	// تحميل البيانات الحالية لوضع التعديل
+	// تحميل البيانات الحالية لوضع التعديل
+	private void loadCurrentData() {
+		Log.d(TAG, "تحميل البيانات الحالية لوضع التعديل");
+
+		Bundle args = getArguments();
+		if (args != null) {
+			// استخدم transfer_id بدلاً من constraint_id
+			transferId = args.getInt("transfer_id", -1);
+			int debitAccountId = args.getInt("debit_account_id", -1);
+			int creditAccountId = args.getInt("credit_account_id", -1);
+			double amount = args.getDouble("amount", 0);
+			String date = args.getString("date", "");
+			String description = args.getString("description", "");
+			int constraintTypeId = args.getInt("constraint_type_id", -1);
+
+			Log.d(TAG, "بيانات وضع التعديل: " + "transferId=" + transferId + ", debitAccountId=" + debitAccountId
+					+ " (مدين)" + ", creditAccountId=" + creditAccountId + " (دائن)" + ", amount=" + amount + ", date="
+					+ date + ", description=" + description + ", constraintTypeId=" + constraintTypeId);
+
+			// تعيين القيم في واجهة المستخدم
+			this.debitAccountId = debitAccountId;
+			this.creditAccountId = creditAccountId;
+			this.selectedConstraintTypeId = constraintTypeId;
+
+			// تحديث القوائم
+			updateDebitAccountsList();
+			updateCreditAccountsList();
+
+			// تعيين القيم في حقول الإدخال
+			for (Account account : accountsList) {
+				if (account.getAccountId() == debitAccountId) {
+					debitAccountSpinner.setText(account.getAccountName(), false);
+					break;
+				}
+			}
+
+			for (Account account : accountsList) {
+				if (account.getAccountId() == creditAccountId) {
+					creditAccountSpinner.setText(account.getAccountName(), false);
+					break;
+				}
+			}
+
+			for (ConstraintType type : constraintTypes) {
+				if (type.getConstraintTypeId() == constraintTypeId) {
+					operationTypeSpinner.setText(type.getConstraintTypeName(), false);
+					break;
+				}
+			}
+
+			// تنسيق المبلغ للعرض
+			DecimalFormat df = new DecimalFormat("#,##0", new DecimalFormatSymbols(Locale.US));
+			amountEditText.setText(df.format(amount));
+
+			dateEditText.setText(date);
+
+			// استخراج الوصف المخصص (إذا وجد)
+			String defaultDescription = "تحويل من حساب : [" + getAccountNameById(creditAccountId) + "] الى حساب : ["
+					+ getAccountNameById(debitAccountId) + "]";
+
+			if (description.startsWith(defaultDescription)) {
+				String userDescription = description.substring(defaultDescription.length()).trim();
+				if (userDescription.startsWith("\n")) {
+					userDescription = userDescription.substring(1).trim();
+				}
+				descriptionEditText.setText(userDescription);
+			} else {
+				descriptionEditText.setText(description);
+			}
+
+			// تفعيل زر التحديث
+			validateInputs();
+		}
+	}
+
+	// Set current date as default in date field
+	private void setCurrentDate() {
+		final Calendar calendar = Calendar.getInstance();
+		// استخدام اللغة الإنجليزية لعرض الأرقام الإنجليزية
+		final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+		String currentDate = sdf.format(calendar.getTime());
+		dateEditText.setText(currentDate);
+	}
+
+	// Load accounts from database and setup spinner
+	private void loadAccounts() {
+		Log.d(TAG, "Loading accounts");
+		accountsList = dbHelper.getAllAccounts();
+
+		// إنشاء قائمتين منفصلتين
+		debitAccountsList = new ArrayList<>(accountsList);
+		creditAccountsList = new ArrayList<>(accountsList);
+
+		// إنشاء محولات منفصلة
+		debitAccountAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line,
+				debitAccountsList);
+		creditAccountAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line,
+				creditAccountsList);
+
+		debitAccountSpinner.setAdapter(debitAccountAdapter);
+		creditAccountSpinner.setAdapter(creditAccountAdapter);
+
+		debitAccountSpinner.setOnItemClickListener((parent, view, position, id) -> {
+			Account selectedAccount = (Account) parent.getItemAtPosition(position);
+			debitAccountId = selectedAccount.getAccountId();
+			Log.d(TAG, "Debit account selected: " + selectedAccount.getAccountName() + " (ID: " + debitAccountId + ")");
+			// تحديث قائمة الحسابات الدائنة
+			updateCreditAccountsList();
+			validateInputs();
+		});
+
+		creditAccountSpinner.setOnItemClickListener((parent, view, position, id) -> {
+			Account selectedAccount = (Account) parent.getItemAtPosition(position);
+			creditAccountId = selectedAccount.getAccountId();
+			Log.d(TAG,
+					"Credit account selected: " + selectedAccount.getAccountName() + " (ID: " + creditAccountId + ")");
+			// تحديث قائمة الحسابات المدينة
+			updateDebitAccountsList();
+			validateInputs();
+		});
+	}
+
+	// تحديث قائمة الحسابات الدائنة
+	private void updateCreditAccountsList() {
+		creditAccountsList.clear();
+		creditAccountsList.addAll(accountsList);
+
+		// إزالة الحساب المدين من قائمة الحسابات الدائنة
+		if (debitAccountId != -1) {
+			for (int i = 0; i < creditAccountsList.size(); i++) {
+				if (creditAccountsList.get(i).getAccountId() == debitAccountId) {
+					creditAccountsList.remove(i);
+					break;
+				}
+			}
+		}
+
+		creditAccountAdapter.notifyDataSetChanged();
+
+		// إذا كان الحساب الدائن الحالي تمت إزالته، قم بإلغاء تحديده
+		if (creditAccountId != -1) {
+			boolean accountExists = false;
+			for (Account account : creditAccountsList) {
+				if (account.getAccountId() == creditAccountId) {
+					accountExists = true;
+					break;
+				}
+			}
+			if (!accountExists) {
+				creditAccountId = -1;
+				creditAccountSpinner.setText("", false);
+			}
+		}
+	}
+
+	// تحديث قائمة الحسابات المدينة
+	private void updateDebitAccountsList() {
+		debitAccountsList.clear();
+		debitAccountsList.addAll(accountsList);
+
+		// إزالة الحساب الدائن من قائمة الحسابات المدينة
+		if (creditAccountId != -1) {
+			for (int i = 0; i < debitAccountsList.size(); i++) {
+				if (debitAccountsList.get(i).getAccountId() == creditAccountId) {
+					debitAccountsList.remove(i);
+					break;
+				}
+			}
+		}
+
+		debitAccountAdapter.notifyDataSetChanged();
+
+		// إذا كان الحساب المدين الحالي تمت إزالته، قم بإلغاء تحديده
+		if (debitAccountId != -1) {
+			boolean accountExists = false;
+			for (Account account : debitAccountsList) {
+				if (account.getAccountId() == debitAccountId) {
+					accountExists = true;
+					break;
+				}
+			}
+			if (!accountExists) {
+				debitAccountId = -1;
+				debitAccountSpinner.setText("", false);
+			}
+		}
+	}
+
+	// Get account name by ID
+	private String getAccountNameById(int accountId) {
+		for (Account account : accountsList) {
+			if (account.getAccountId() == accountId) {
+				return account.getAccountName();
+			}
+		}
+		return "";
+	}
+
+	// Format date to English for database storage
+	private String formatDateToEnglish(String dateStr) {
+		if (dateStr == null || dateStr.isEmpty()) {
+			return "";
+		}
+		try {
+			// Try to parse the date with default locale
+			SimpleDateFormat defaultFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+			SimpleDateFormat englishFormat = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+			// Parse the date and format it to English
+			return englishFormat.format(defaultFormat.parse(dateStr));
+		} catch (Exception e) {
+			Log.e(TAG, "Error formatting date to English: " + dateStr, e);
+			// If parsing fails, return the original string
+			return dateStr;
+		}
+	}
+
+	// Load constraint types from database and setup spinner
+	private void loadConstraintTypes() {
+		Log.d(TAG, "Loading constraint types");
+		constraintTypes = dbHelper.getAllConstraintTypes();
+		constraintTypeAdapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line,
+				constraintTypes);
+		operationTypeSpinner.setAdapter(constraintTypeAdapter);
+
+		operationTypeSpinner.setOnItemClickListener((parent, view, position, id) -> {
+			ConstraintType selectedType = (ConstraintType) parent.getItemAtPosition(position);
+			selectedConstraintTypeId = selectedType.getConstraintTypeId();
+			Log.d(TAG, "Constraint type selected: " + selectedType.getConstraintTypeName() + " (ID: "
+					+ selectedConstraintTypeId + ")");
+			validateInputs();
+		});
+
+		operationTypeSpinner.addTextChangedListener(new TextWatcher() {
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+				selectedConstraintTypeId = -1;
+				validateInputs();
+			}
+
+			@Override
+			public void afterTextChanged(Editable s) {
+			}
+		});
+	}
+
+	// Setup UI listeners
+	private void setupListeners() {
+		actionButton.setOnClickListener(v -> {
+			Log.d(TAG, "Action button clicked");
+			performAction();
+		});
+
+		cancelButton.setOnClickListener(v -> {
+			Log.d(TAG, "Cancel button clicked");
+			dismiss();
+		});
+
+		// Setup date picker with the same format as the rest of the app
+		setupDatePicker();
+
+		// Add text change listener for amount field
+		amountEditText.addTextChangedListener(new TextWatcher() {
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+				validateInputs();
+			}
+
+			@Override
+			public void afterTextChanged(Editable s) {
+			}
+		});
+	}
+
+	// Setup date picker dialog
+	private void setupDatePicker() {
+		final Calendar calendar = Calendar.getInstance();
+		// استخدام اللغة الإنجليزية لعرض الأرقام الإنجليزية
+		final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH);
+		dateEditText.setOnClickListener(v -> {
+			DatePickerDialog datePickerDialog = new DatePickerDialog(getContext(), (view1, year, month, dayOfMonth) -> {
+				calendar.set(year, month, dayOfMonth);
+				String selectedDate = sdf.format(calendar.getTime());
+				dateEditText.setText(selectedDate);
+			}, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
+			datePickerDialog.show();
+		});
+	}
+
+	// Validate user inputs
+	private void validateInputs() {
+		boolean isValid = debitAccountId != -1 && creditAccountId != -1 && debitAccountId != creditAccountId
+				&& !TextUtils.isEmpty(amountEditText.getText())
+				&& (selectedConstraintTypeId != -1 || !TextUtils.isEmpty(operationTypeSpinner.getText()));
+		actionButton.setEnabled(isValid);
+		Log.d(TAG,
+				"Validation: " + isValid + ", debitAccountId: " + debitAccountId + ", creditAccountId: "
+						+ creditAccountId + ", amount: " + !TextUtils.isEmpty(amountEditText.getText())
+						+ ", constraintType: " + selectedConstraintTypeId);
+	}
+
+	// Validate transfer inputs before performing transfer
+	private boolean validateTransferInputs() {
+		Log.d(TAG, "Validating inputs");
+		if (debitAccountId == -1) {
+			Log.d(TAG, "Debit account not selected");
+			Toast.makeText(requireContext(), "الرجاء اختيار الحساب المدين", Toast.LENGTH_SHORT).show();
+			return false;
+		}
+		if (creditAccountId == -1) {
+			Log.d(TAG, "Credit account not selected");
+			Toast.makeText(requireContext(), "الرجاء اختيار الحساب الدائن", Toast.LENGTH_SHORT).show();
+			return false;
+		}
+		if (debitAccountId == creditAccountId) {
+			Log.d(TAG, "Same account selected");
+			Toast.makeText(requireContext(), "لا يمكن التحويل لنفس الحساب", Toast.LENGTH_SHORT).show();
+			return false;
+		}
+		String amountStr = amountEditText.getText().toString().trim();
+		if (amountStr.isEmpty()) {
+			Log.d(TAG, "Amount is empty");
+			Toast.makeText(requireContext(), "الرجاء إدخال المبلغ", Toast.LENGTH_SHORT).show();
+			return false;
+		}
+		try {
+			double amount = parseAmount(amountStr);
+			if (amount <= 0) {
+				Log.d(TAG, "Invalid amount: " + amount);
+				Toast.makeText(requireContext(), "المبلغ يجب أن يكون أكبر من صفر", Toast.LENGTH_SHORT).show();
+				return false;
+			}
+		} catch (NumberFormatException e) {
+			Log.d(TAG, "Amount format error");
+			Toast.makeText(requireContext(), "المبلغ غير صحيح", Toast.LENGTH_SHORT).show();
+			return false;
+		}
+		Log.d(TAG, "All validations passed");
+		return true;
+	}
+
+	// Get selected constraint type ID
+	private int getSelectedConstraintTypeId() {
+		if (selectedConstraintTypeId != -1) {
+			return selectedConstraintTypeId;
+		}
+		String operationType = operationTypeSpinner.getText().toString().trim();
+		if (!operationType.isEmpty()) {
+			for (ConstraintType type : constraintTypes) {
+				if (type.getConstraintTypeName().equals(operationType)) {
+					return type.getConstraintTypeId();
+				}
+			}
+		}
+		// Default to first constraint type if none selected
+		if (!constraintTypes.isEmpty()) {
+			return constraintTypes.get(0).getConstraintTypeId();
+		}
+		return 1; // Fallback to ID 1
+	}
+
+	// Parse amount string to double
+	private double parseAmount(String amountStr) {
+		if (amountStr == null || amountStr.isEmpty()) {
+			return 0;
+		}
+		try {
+			// Remove commas and any other symbols
+			String cleanAmountStr = amountStr.replace(",", "").trim();
+			// استبدال الفواصل العربية العشرية بنقطة إذا وجدت
+			cleanAmountStr = cleanAmountStr.replace("٫", ".").replace("٬", "");
+			return Double.parseDouble(cleanAmountStr);
+		} catch (NumberFormatException e) {
+			Log.e(TAG, "Error parsing amount: " + amountStr, e);
+			return 0;
+		}
+	}
+
+	// تنفيذ عملية التعديل
+	// تنفيذ عملية التعديل
+	private void performAction() {
+		Log.d(TAG, "performEditAction called");
+
+		// Validate inputs
+		if (!validateTransferInputs()) {
+			Log.d(TAG, "Validation failed");
+			return;
+		}
+
+		// Get input values
+		String amountStr = amountEditText.getText().toString().trim();
+		double amount = parseAmount(amountStr);
+		String date = dateEditText.getText().toString().trim();
+		String userDescription = descriptionEditText.getText().toString().trim();
+
+		// Get constraint type ID
+		int operationTypeId = getSelectedConstraintTypeId();
+		Log.d(TAG, "Operation type ID: " + operationTypeId);
+
+		// بناء البيان بتنسيق صحيح
+		String debitAccountName = getAccountNameById(debitAccountId);
+		String creditAccountName = getAccountNameById(creditAccountId);
+		String defaultDescription = "تحويل من حساب : [" + creditAccountName + "] الى حساب : [" + debitAccountName + "]";
+
+		// Combine default description with user description
+		String fullDescription;
+		if (userDescription.isEmpty()) {
+			fullDescription = defaultDescription;
+		} else {
+			fullDescription = defaultDescription + "\n" + userDescription;
+		}
+
+		// Format date to English before saving to database
+		String formattedDate = formatDateToEnglish(date);
+
+		// Execute update in background
+		new UpdateTransferTask(transferId, debitAccountId, creditAccountId, amount, formattedDate, fullDescription,
+				operationTypeId).execute();
+	}
+
+	// AsyncTask for updating transfer operation
+	private class UpdateTransferTask extends AsyncTask<Void, Void, Boolean> {
+		private final int transferId;
+		private final int debitAccountId;
+		private final int creditAccountId;
+		private final double amount;
+		private final String date;
+		private final String description;
+		private final int operationTypeId;
+
+		public UpdateTransferTask(int transferId, int debitAccountId, int creditAccountId, double amount, String date,
+				String description, int operationTypeId) {
+			this.transferId = transferId;
+			this.debitAccountId = debitAccountId;
+			this.creditAccountId = creditAccountId;
+			this.amount = amount;
+			this.date = date;
+			this.description = description;
+			this.operationTypeId = operationTypeId;
+		}
+
+		@Override
+		protected Boolean doInBackground(Void... voids) {
+			try {
+				Log.d(TAG, "Starting transfer update with ID: " + transferId);
+				Log.d(TAG, "Debit Account ID: " + debitAccountId);
+				Log.d(TAG, "Credit Account ID: " + creditAccountId);
+				Log.d(TAG, "Amount: " + amount);
+				Log.d(TAG, "Date: " + date);
+				Log.d(TAG, "Description: " + description);
+				Log.d(TAG, "Operation Type ID: " + operationTypeId);
+
+				// استخدام الطريقة المعدلة في DatabaseHelper
+				boolean result = dbHelper.updateTransfer(transferId, debitAccountId, creditAccountId, amount, date,
+						description, operationTypeId);
+
+				Log.d(TAG, "Transfer update result: " + result);
+				return result;
+			} catch (Exception e) {
+				Log.e(TAG, "Error updating transfer: " + e.getMessage(), e);
+				e.printStackTrace();
+				return false;
+			}
+		}
+
+		@Override
+		protected void onPostExecute(Boolean success) {
+			if (success) {
+				Log.d(TAG, "Transfer updated successfully");
+				Toast.makeText(requireContext(), "تم تحديث التحويل بنجاح", Toast.LENGTH_SHORT).show();
+
+				// Notify listener about transfer completion
+				if (listener != null) {
+					Log.d(TAG, "Notifying listener about transfer completion");
+					listener.onTransferComplete();
+				}
+
+				dismiss();
+			} else {
+				Log.e(TAG, "Failed to update transfer");
+				Toast.makeText(requireContext(), "فشل تحديث التحويل", Toast.LENGTH_SHORT).show();
+			}
+		}
+	}
+}

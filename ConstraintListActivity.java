@@ -28,6 +28,7 @@ import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -47,10 +48,13 @@ import java.util.Map;
 public class ConstraintListActivity extends BaseActivity
 		implements EditConstraintDialogFragment.OnConstraintEditedListener,
 		AddConstraintDialogFragment.OnDateSelectedListener, DateFilterDialog.OnFilterListener,
-		DeleteConstraintDialogFragment.OnConstraintsDeletedListener, ExchangeFragment.OnTransferCompleteListener {
+		DeleteConstraintDialogFragment.OnConstraintsDeletedListener, AddExchangeFragment.OnTransferCompleteListener,
+		EditExchangeFragment.OnTransferCompleteListener, DeleteTransferDialogFragment.OnTransferDeletedListener {
+
 	// Constants
 	private static final String TAG = "ConstraintListActivity";
 	private static final int REQUEST_PERMISSION = 123;
+
 	// UI Components
 	private MaterialToolbar toolbar;
 	private FloatingActionButton fabAddNewConstraint;
@@ -59,11 +63,13 @@ public class ConstraintListActivity extends BaseActivity
 	private ImageButton btnFilter, btnExchange;
 	private LinearLayout aboveBottomBar;
 	private static final int EXCHANGE_REQUEST_CODE = 100;
+
 	// Data Components
 	private ConstraintAdapter adapter;
 	private DatabaseHelper dbHelper;
 	private List<Constraint> constraintList;
 	private Map<Integer, String> typeIdToNameMap = new HashMap<>();
+
 	// State Variables
 	private String accountType;
 	private int accountId;
@@ -74,8 +80,10 @@ public class ConstraintListActivity extends BaseActivity
 	private boolean isAboveBottomBarVisible = true;
 	private boolean isProcessingLongClick = false;
 	private boolean isScrolling = false; // متغير جديد لتتبع حالة التمرير
+
 	// Action Mode
 	private ActionMode actionMode;
+
 	// Preferences Manager
 	private PreferencesManager preferencesManager;
 
@@ -83,13 +91,13 @@ public class ConstraintListActivity extends BaseActivity
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_constraint_list);
+
 		// Initialize components
 		initViews();
 		initData();
 		setupRecyclerView();
 		loadInitialData(); // This creates the adapter
 		setupClickListeners();
-		// Load initial data
 	}
 
 	@Override
@@ -113,10 +121,12 @@ public class ConstraintListActivity extends BaseActivity
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		getMenuInflater().inflate(R.menu.top_app_bar, menu);
+
 		// Search setup
 		MenuItem searchItem = menu.findItem(R.id.action_search);
 		SearchView searchView = (SearchView) searchItem.getActionView();
 		setupSearchView(searchView);
+
 		// PDF setup
 		MenuItem pdfItem = menu.findItem(R.id.action_pdf);
 		pdfItem.setOnMenuItemClickListener(item -> {
@@ -124,15 +134,18 @@ public class ConstraintListActivity extends BaseActivity
 				createPdfAndOpen();
 			return true;
 		});
+
 		// إظهار الأيقونات في قائمة الفائض
 		if (menu instanceof MenuBuilder) {
 			MenuBuilder menuBuilder = (MenuBuilder) menu;
 			menuBuilder.setOptionalIconsVisible(true);
 		}
+
 		MenuItem settingsItem = menu.findItem(R.id.action_settings);
 		if (settingsItem != null) {
 			settingsItem.setVisible(false);
 		}
+
 		return true;
 	}
 
@@ -179,11 +192,6 @@ public class ConstraintListActivity extends BaseActivity
 	}
 
 	@Override
-	public void onConstraintsDeleted() {
-		loadConstraints();
-	}
-
-	@Override
 	public void onDateSelected(String selectedDate) {
 		lastSelectedDate = selectedDate;
 	}
@@ -198,12 +206,17 @@ public class ConstraintListActivity extends BaseActivity
 		recalculateTotals();
 	}
 
+	@Override
+	public void onTransferComplete() {
+		loadConstraints();
+	}
+
 	// Initialization Methods
 	private void initViews() {
 		toolbar = findViewById(R.id.topAppBar);
 		recyclerView = findViewById(R.id.recycler_view);
-		tvDebit = findViewById(R.id.tv_debit);
-		tvCredit = findViewById(R.id.tv_credit);
+		//	tvDebit = findViewById(R.id.tv_debit);
+		//	tvCredit = findViewById(R.id.tv_credit);
 		tvBalance = findViewById(R.id.tv_balance);
 		tvRight = findViewById(R.id.tv_right);
 		tvLeft = findViewById(R.id.tv_left);
@@ -211,6 +224,7 @@ public class ConstraintListActivity extends BaseActivity
 		aboveBottomBar = findViewById(R.id.aboveBottomBar);
 		fabAddNewConstraint = findViewById(R.id.fab_add_new_constraint);
 		btnExchange = findViewById(R.id.btn_exchange);
+
 		setSupportActionBar(toolbar);
 		if (toolbar.getOverflowIcon() != null) {
 			toolbar.getOverflowIcon().setTint(ContextCompat.getColor(this, android.R.color.black));
@@ -223,11 +237,13 @@ public class ConstraintListActivity extends BaseActivity
 		accountId = intent.getIntExtra("account_id", -1);
 		String accountName = intent.getStringExtra("account_name");
 		accountType = intent.getStringExtra("account_type");
+
 		if (accountId == -1) {
 			Toast.makeText(this, "Error: No account selected", Toast.LENGTH_SHORT).show();
 			finish();
 			return;
 		}
+
 		toolbar.setTitle(accountName);
 		toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
@@ -279,11 +295,9 @@ public class ConstraintListActivity extends BaseActivity
 					// إيقاف أي عمليات مؤجلة عند بدء اللمس
 					rv.removeCallbacks(null);
 					break;
-
 				case MotionEvent.ACTION_MOVE:
 					float dy = Math.abs(e.getY() - startY);
 					float dx = Math.abs(e.getX() - startX);
-
 					// إذا كانت مسافة التمرير أكبر من الحد الأدنى، فاعتبرها تمريراً وليس ضغطة طويلة
 					if (dy > MIN_SCROLL_DISTANCE || dx > MIN_SCROLL_DISTANCE) {
 						rv.removeCallbacks(null);
@@ -332,6 +346,15 @@ public class ConstraintListActivity extends BaseActivity
 				if (adapter.getSelectedItems().isEmpty()) {
 					actionMode.finish();
 				}
+			} else {
+				Constraint selected = constraintList.get(position);
+				int constId = selected.getId();
+				Bundle bundle = new Bundle();
+				bundle.putInt("ACCOUNT_ID", accountId);
+				bundle.putInt("CONST_ID", constId);
+				ConstraintDetailsDialogFragment dialogFragment = new ConstraintDetailsDialogFragment();
+				dialogFragment.setArguments(bundle);
+				dialogFragment.show(getSupportFragmentManager(), "Details Dialog");
 			}
 		});
 
@@ -355,16 +378,25 @@ public class ConstraintListActivity extends BaseActivity
 		});
 
 		// تعيين مستمعي الأزرار
-		findViewById(R.id.btn_add_constraint).setOnClickListener(v -> showAddConstraintDialog());
 		fabAddNewConstraint.setOnClickListener(v -> showAddConstraintDialog());
 		btnFilter.setOnClickListener(v -> openFilterDialog());
 
+		// تعديل مستمع زر التحويل لفتح شاشة إضافة التحويل
 		btnExchange.setOnClickListener(v -> {
-			ExchangeFragment dialog = new ExchangeFragment();
-			dialog.setOnTransferCompleteListener(this); // ضبط الـ listener
-			dialog.show(getSupportFragmentManager(), "ExchangeDialog");
-		});
+			// إضافة معرف الحساب الحالي إلى الـ Bundle
+			Bundle args = new Bundle();
+			args.putInt("current_account_id", accountId);
 
+			// إنشاء fragment الإضافة
+			AddExchangeFragment addFragment = new AddExchangeFragment();
+			addFragment.setArguments(args);
+
+			// ضبط الـ listener
+			addFragment.setOnTransferCompleteListener(this);
+
+			// عرض الـ Fragment
+			addFragment.show(getSupportFragmentManager(), "AddExchangeDialog");
+		});
 	}
 
 	// Data Loading Methods
@@ -374,8 +406,66 @@ public class ConstraintListActivity extends BaseActivity
 		for (ConstraintType type : types) {
 			typeIdToNameMap.put(type.getConstraintTypeId(), type.getConstraintTypeName());
 		}
-		// Load constraints
+
+		// Load constraints and transfers
 		loadConstraints();
+	}
+
+	public void loadConstraintsAndTransfers() {
+		if (dbHelper == null)
+			return;
+
+		// Get regular constraints (excluding transfer type)
+		List<Constraint> regularConstraints = dbHelper.getAllConstraintsByAccountId(accountId);
+
+		// Get transfers related to this account
+		List<Transfer> transfers = dbHelper.getTransfersByAccountId(accountId);
+
+		// Convert transfers to constraints
+		List<Constraint> transferConstraints = new ArrayList<>();
+		for (Transfer transfer : transfers) {
+			// Create debit constraint
+			if (transfer.getDebitAccountId() == accountId) {
+				Constraint debitConstraint = new Constraint(-1, // We'll use a temporary ID
+						accountId, transfer.getTypeId(), transfer.getDate(), transfer.getDetails(),
+						transfer.getAmount(), 0.0);
+				debitConstraint.setTransferId(transfer.getTransferId());
+				transferConstraints.add(debitConstraint);
+			}
+
+			// Create credit constraint
+			if (transfer.getCreditAccountId() == accountId) {
+				Constraint creditConstraint = new Constraint(-1, // We'll use a temporary ID
+						accountId, transfer.getTypeId(), transfer.getDate(), transfer.getDetails(), 0.0,
+						transfer.getAmount());
+				creditConstraint.setTransferId(transfer.getTransferId());
+				transferConstraints.add(creditConstraint);
+			}
+		}
+
+		// Combine regular constraints and transfer constraints
+		constraintList = new ArrayList<>();
+		constraintList.addAll(regularConstraints);
+		constraintList.addAll(transferConstraints);
+
+		// Sort by date (newest first)
+		Collections.sort(constraintList, (c1, c2) -> {
+			int dateCompare = c2.getDate().compareTo(c1.getDate());
+			if (dateCompare != 0) {
+				return dateCompare;
+			}
+			return Integer.compare(c2.getId(), c1.getId());
+		});
+
+		if (adapter == null) {
+			adapter = new ConstraintAdapter(this, constraintList, accountType);
+			adapter.setTypeIdToNameMap(typeIdToNameMap);
+			recyclerView.setAdapter(adapter);
+		} else {
+			adapter.updateData(constraintList);
+		}
+
+		recalculateTotals();
 	}
 
 	public void loadConstraints() {
@@ -385,7 +475,6 @@ public class ConstraintListActivity extends BaseActivity
 		// جلب القيود مرتبة من الأحدث إلى الأقدم مباشرة من قاعدة البيانات
 		List<Constraint> newConstraints = dbHelper.getAllConstraintsByAccountId(accountId);
 
-		// لم نعد بحاجة لعكس الترتيب لأننا قمنا بالترتيب في قاعدة البيانات
 		constraintList = newConstraints != null ? newConstraints : new ArrayList<>();
 
 		if (adapter == null) {
@@ -399,77 +488,51 @@ public class ConstraintListActivity extends BaseActivity
 		recalculateTotals();
 	}
 
-	private void openExchangeFragmentForEdit(Constraint constraint) {
-		// البحث عن القيد المقابل للتحويل (القيد الآخر في عملية التحويل)
-		List<Constraint> relatedConstraints = dbHelper.findRelatedTransferConstraints(constraint.getId());
+	// تعديل طريقة فتح fragment التحويل للتعديل
+	// تعديل طريقة فتح fragment التحويل للتعديل
+	public void openExchangeFragmentForEdit(Constraint constraint) {
+		if (constraint.getTransferId() != null) {
+			// هذا تحويل - ابحث عن القيد المقابل
+			Constraint matchingConstraint = dbHelper.getMatchingTransferConstraint(constraint.getTransferId(),
+					constraint.getAccountId());
+			if (matchingConstraint != null) {
+				// إعداد البيانات للتعديل
+				Bundle args = new Bundle();
+				// تأكد من أن transferId يتم تمريره كـ int وليس Integer
+				args.putInt("transfer_id", constraint.getTransferId());
 
-		int toAccountId = -1;
-		if (!relatedConstraints.isEmpty()) {
-			Constraint relatedConstraint = relatedConstraints.get(0);
-			toAccountId = relatedConstraint.getAccountId();
-			Log.d("ConstraintListActivity", "Found related constraint with account ID: " + toAccountId);
+				// تحديد الحساب المدين والحساب الدائن
+				int debitAccountId, creditAccountId;
+				if (constraint.getDebit() > 0) {
+					// هذا القيد هو قيد مدين
+					debitAccountId = constraint.getAccountId();
+					creditAccountId = matchingConstraint.getAccountId();
+				} else {
+					// هذا القيد هو قيد دائن
+					debitAccountId = matchingConstraint.getAccountId();
+					creditAccountId = constraint.getAccountId();
+				}
+
+				args.putInt("debit_account_id", debitAccountId);
+				args.putInt("credit_account_id", creditAccountId);
+				args.putDouble("amount", constraint.getDebit() > 0 ? constraint.getDebit() : constraint.getCredit());
+				args.putString("date", constraint.getDate());
+				args.putString("description", constraint.getDetails());
+				args.putInt("constraint_type_id", constraint.getConstraintTypeId());
+
+				// إنشاء fragment التعديل
+				EditExchangeFragment editFragment = new EditExchangeFragment();
+				editFragment.setArguments(args);
+				editFragment.setOnTransferCompleteListener(this);
+				editFragment.show(getSupportFragmentManager(), "EditExchangeDialog");
+			}
 		} else {
-			Log.d("ConstraintListActivity", "No related constraints found");
+			// قيد عادي - استخدم طريقة التعديل العادية
+			EditConstraintDialogFragment editDialog = EditConstraintDialogFragment.newInstance(constraint,
+					"تعديل القيد");
+			editDialog.setOnConstraintEditedListener(this);
+			editDialog.show(getSupportFragmentManager(), "EditDialog");
 		}
-
-		// إنشاء فراجمنت التحويل
-		ExchangeFragment dialog = new ExchangeFragment();
-
-		// إعداد البيانات للتعديل
-		Bundle args = new Bundle();
-		args.putInt("constraint_id", constraint.getId());
-		args.putInt("from_account_id", constraint.getAccountId());
-		args.putInt("to_account_id", toAccountId);
-		double amount = constraint.getDebit() > 0 ? constraint.getDebit() : constraint.getCredit();
-		args.putDouble("amount", amount);
-		args.putString("date", constraint.getDate());
-		String description = constraint.getDetails().replace(" (تحويل إلى حساب آخر)", "")
-				.replace(" (تحويل من حساب آخر)", "");
-		args.putString("description", description);
-		args.putInt("constraint_type_id", constraint.getConstraintTypeId());
-		args.putBoolean("is_edit_mode", true);
-
-		dialog.setArguments(args);
-		dialog.setOnTransferCompleteListener(this);
-
-		Log.d("ConstraintListActivity",
-				"Opening ExchangeFragment for edit with args: " + "constraint_id=" + constraint.getId()
-						+ ", from_account_id=" + constraint.getAccountId() + ", to_account_id=" + toAccountId
-						+ ", amount=" + amount + ", date=" + constraint.getDate() + ", description=" + description
-						+ ", constraint_type_id=" + constraint.getConstraintTypeId() + ", is_edit_mode=true");
-
-		dialog.show(getSupportFragmentManager(), "EditExchangeDialog");
-	}
-
-	private void filterConstraints(String fromDate, String toDate, int accountId) {
-		Cursor cursor = dbHelper.getReadableDatabase().rawQuery(
-				"SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?"
-						+ " AND " + DBConstants.COL_CONST_DATE + " >= ?" + " AND " + DBConstants.COL_CONST_DATE
-						+ " <= ?" + " ORDER BY " + DBConstants.COL_CONST_DATE + " DESC, " + DBConstants.COL_CONST_ID
-						+ " DESC", // تغيير الترتيب
-				new String[] { String.valueOf(accountId), fromDate, toDate });
-		ArrayList<Constraint> filteredList = new ArrayList<>();
-		if (cursor.moveToFirst()) {
-			do {
-				int id = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ID));
-				int accId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ACCOUNT_ID));
-				int typeId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_TYPE));
-				String date = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DATE));
-				String details = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DETAILS));
-				double debit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_DEBIT));
-				double credit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_CREDIT));
-				filteredList.add(new Constraint(id, accId, typeId, date, details, debit, credit));
-			} while (cursor.moveToNext());
-		}
-		cursor.close();
-
-		// لم نعد بحاجة لعكس الترتيب لأننا قمنا بالترتيب في قاعدة البيانات
-		constraintList = filteredList;
-		if (adapter != null) {
-			adapter.updateData(constraintList);
-		}
-
-		recalculateTotals();
 	}
 
 	// UI Update Methods
@@ -487,12 +550,15 @@ public class ConstraintListActivity extends BaseActivity
 			updateBalanceSummaryDisplay(0.0, 0.0, 0.0);
 			return;
 		}
+
 		double totalDebit = 0.0;
 		double totalCredit = 0.0;
+
 		for (Constraint constraint : constraintList) {
 			totalDebit += constraint.getDebit();
 			totalCredit += constraint.getCredit();
 		}
+
 		double totalBalance;
 		if ("صندوق".equals(accountType) || "مدين".equals(accountType)) {
 			totalBalance = totalDebit - totalCredit;
@@ -501,32 +567,38 @@ public class ConstraintListActivity extends BaseActivity
 		} else {
 			totalBalance = 0.0;
 		}
+
 		updateBalanceSummaryDisplay(totalDebit, totalCredit, totalBalance);
 	}
 
 	private void updateBalanceSummary() {
 		if (dbHelper == null)
 			return;
+
 		double debit = dbHelper.getTotalDebitByDate(accountId, fromDateFilter, toDateFilter);
 		double credit = dbHelper.getTotalCreditByDate(accountId, fromDateFilter, toDateFilter);
 		double balance = dbHelper.getAccountBalanceByDate(accountId, accountType, fromDateFilter, toDateFilter);
+
 		updateBalanceSummaryDisplay(debit, credit, balance);
 	}
 
 	private void updateBalanceSummaryDisplay(double debit, double credit, double balance) {
-		DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.getDefault());
-		symbols.setGroupingSeparator(',');
-		DecimalFormat formatter = new DecimalFormat("#,###.##", symbols);
-		tvDebit.setText("مدين:  " + formatter.format(debit));
-		tvCredit.setText("دائن:  " + formatter.format(credit));
-		tvBalance.setText("الرصيد:  " + formatter.format(balance));
-		tvRight.setText("مدين : " + formatter.format(debit));
-		tvLeft.setText("دائن:  " + formatter.format(credit));
+		tvBalance.setText("الــرصــيد: " + formatNumber(balance));
+		tvLeft.setText("دائــن: : " + formatNumber(credit));
+		tvRight.setText("مـدين: : " + formatNumber(debit));
+
 		if (balance < 0) {
 			tvBalance.setTextColor(ContextCompat.getColor(this, android.R.color.holo_red_dark));
 		} else {
 			tvBalance.setTextColor(ContextCompat.getColor(this, android.R.color.holo_green_dark));
 		}
+	}
+
+	public static String formatNumber(double number) {
+		DecimalFormatSymbols symbols = new DecimalFormatSymbols(Locale.ENGLISH);
+		symbols.setGroupingSeparator(',');
+		DecimalFormat formatter = new DecimalFormat("#,###.##", symbols);
+		return formatter.format(number);
 	}
 
 	private void hideAboveBottomBar() {
@@ -559,6 +631,7 @@ public class ConstraintListActivity extends BaseActivity
 				return true;
 			}
 		});
+
 		searchView.setOnCloseListener(() -> {
 			if (fromDateFilter != null && toDateFilter != null) {
 				filterConstraints(fromDateFilter, toDateFilter, accountId);
@@ -569,13 +642,40 @@ public class ConstraintListActivity extends BaseActivity
 		});
 	}
 
+	private void filterConstraints(String fromDate, String toDate, int accountId) {
+		Cursor cursor = dbHelper.getConstraintsByDateAndAccount(fromDate, toDate, accountId);
+		ArrayList<Constraint> filteredList = new ArrayList<>();
+
+		if (cursor.moveToFirst()) {
+			do {
+				int id = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ID));
+				int accId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ACCOUNT_ID));
+				int typeId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_TYPE));
+				String date = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DATE));
+				String details = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DETAILS));
+				double debit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_DEBIT));
+				double credit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_CREDIT));
+
+				filteredList.add(new Constraint(id, accId, typeId, date, details, debit, credit));
+			} while (cursor.moveToNext());
+		}
+		cursor.close();
+
+		constraintList = filteredList;
+		if (adapter != null) {
+			adapter.updateData(constraintList);
+		}
+		recalculateTotals();
+	}
+
 	private void searchInDisplayedConstraints(String searchText) {
 		List<Constraint> originalList;
 		if (fromDateFilter != null && toDateFilter != null) {
-			originalList = getFilteredConstraintsFromDB(fromDateFilter, toDateFilter, accountId);
+			originalList = dbHelper.getFilteredConstraintsByDate(accountId, fromDateFilter, toDateFilter);
 		} else {
 			originalList = dbHelper.getAllConstraintsByAccountId(accountId);
 		}
+
 		List<Constraint> filteredList = new ArrayList<>();
 		if (searchText.isEmpty()) {
 			filteredList = originalList;
@@ -588,36 +688,38 @@ public class ConstraintListActivity extends BaseActivity
 				}
 			}
 		}
+
 		constraintList = filteredList;
 		if (adapter != null) {
 			adapter.updateData(constraintList);
 		}
 		recalculateTotals();
 	}
-
-	private List<Constraint> getFilteredConstraintsFromDB(String fromDate, String toDate, int accountId) {
-		Cursor cursor = dbHelper.getReadableDatabase().rawQuery(
-				"SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?"
-						+ " AND " + DBConstants.COL_CONST_DATE + " >= ?" + " AND " + DBConstants.COL_CONST_DATE
-						+ " <= ?" + " ORDER BY " + DBConstants.COL_CONST_DATE + " DESC, " + DBConstants.COL_CONST_ID
-						+ " DESC", // تغيير الترتيب
-				new String[] { String.valueOf(accountId), fromDate, toDate });
-		ArrayList<Constraint> filteredList = new ArrayList<>();
-		if (cursor.moveToFirst()) {
-			do {
-				int id = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ID));
-				int accId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ACCOUNT_ID));
-				int typeId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_TYPE));
-				String date = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DATE));
-				String details = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DETAILS));
-				double debit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_DEBIT));
-				double credit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_CREDIT));
-				filteredList.add(new Constraint(id, accId, typeId, date, details, debit, credit));
-			} while (cursor.moveToNext());
-		}
-		cursor.close();
-		return filteredList;
-	}
+	/*private List<Constraint> getFilteredConstraintsFromDB(String fromDate, String toDate, int accountId) {
+			Cursor cursor = dbHelper.getReadableDatabase().rawQuery(
+					"SELECT * FROM " + DBConstants.TABLE_CONSTRIANTS + " WHERE " + DBConstants.COL_CONST_ACCOUNT_ID + " = ?"
+							+ " AND " + DBConstants.COL_CONST_DATE + " >= ?" + " AND " + DBConstants.COL_CONST_DATE
+							+ " <= ?" + " ORDER BY " + DBConstants.COL_CONST_DATE + " DESC, " + DBConstants.COL_CONST_ID
+							+ " DESC", // تغيير الترتيب
+					new String[] { String.valueOf(accountId), fromDate, toDate });
+	
+			ArrayList<Constraint> filteredList = new ArrayList<>();
+			if (cursor.moveToFirst()) {
+				do {
+					int id = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ID));
+					int accId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_ACCOUNT_ID));
+					int typeId = cursor.getInt(cursor.getColumnIndex(DBConstants.COL_CONST_TYPE));
+					String date = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DATE));
+					String details = cursor.getString(cursor.getColumnIndex(DBConstants.COL_CONST_DETAILS));
+					double debit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_DEBIT));
+					double credit = cursor.getDouble(cursor.getColumnIndex(DBConstants.COL_CONST_CREDIT));
+	
+					filteredList.add(new Constraint(id, accId, typeId, date, details, debit, credit));
+				} while (cursor.moveToNext());
+			}
+			cursor.close();
+			return filteredList;
+		} */
 
 	private String normalizeArabic(String text) {
 		if (text == null)
@@ -667,6 +769,7 @@ public class ConstraintListActivity extends BaseActivity
 			String accountName = getIntent().getStringExtra("account_name");
 			if (accountName == null)
 				accountName = "Unknown Account";
+
 			ConstraintPdfGenerator.createAndOpenPdf(this, accountName, constraintList, typeIdToNameMap, accountId,
 					accountType, fromDateFilter, toDateFilter);
 		}
@@ -708,10 +811,12 @@ public class ConstraintListActivity extends BaseActivity
 			if (editItem != null) {
 				editItem.setVisible(selectedCount == 1);
 			}
+
 			// Show delete option for any selection
 			if (deleteItem != null) {
 				deleteItem.setVisible(selectedCount > 0);
 			}
+
 			return true;
 		}
 
@@ -726,11 +831,7 @@ public class ConstraintListActivity extends BaseActivity
 			if (item.getItemId() == R.id.menu_edit) {
 				if (selectedConstraints.size() == 1) {
 					Constraint constraintToEdit = selectedConstraints.get(0);
-					// التحقق من نوع القيد
-					int constraintTypeId = constraintToEdit.getConstraintTypeId();
-					String constraintTypeName = typeIdToNameMap.get(constraintTypeId);
-
-					if ("تحويل".equals(constraintTypeName)) {
+					if (constraintToEdit.getTransferId() != null) {
 						// فتح فراجمنت التحويل للتعديل
 						openExchangeFragmentForEdit(constraintToEdit);
 					} else {
@@ -744,6 +845,7 @@ public class ConstraintListActivity extends BaseActivity
 				mode.finish();
 				return true;
 			} else if (item.getItemId() == R.id.menu_delete) {
+				// استخدام فراجمنت واحد لحذف جميع أنواع القيود
 				DeleteConstraintDialogFragment deleteDialog = DeleteConstraintDialogFragment
 						.newInstance(selectedConstraints);
 				deleteDialog.setOnConstraintsDeletedListener(ConstraintListActivity.this);
@@ -769,8 +871,17 @@ public class ConstraintListActivity extends BaseActivity
 	}
 
 	@Override
-	public void onTransferComplete() {
+	public void onTransferDeleted(int transferId) {
+		dbHelper.deleteTransferConstraint(transferId);
 		loadConstraints();
+		Toast.makeText(this, "تم حذف التحويل بنجاح", Toast.LENGTH_SHORT).show();
+	}
+
+	@Override
+	public void onConstraintsDeleted(List<Constraint> constraints) {
+		dbHelper.deleteMixedConstraints(constraints);
+		loadConstraints();
+		Toast.makeText(this, "تم حذف القيود بنجاح", Toast.LENGTH_SHORT).show();
 	}
 
 }

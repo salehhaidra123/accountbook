@@ -11,6 +11,8 @@ public class Constraint implements Serializable {
 	private String details;
 	private double debit;
 	private double credit;
+	private Integer transferId; 
+	private String transferGroupId;
 	
 	public Constraint() {
 	}
@@ -24,6 +26,7 @@ public class Constraint implements Serializable {
 		this.details = details;
 		this.debit = debit;
 		this.credit = credit;
+		this.transferId = null;
 	}
 	
 	// Constructor without ID (used when adding a new constraint)
@@ -34,6 +37,7 @@ public class Constraint implements Serializable {
 		this.details = details;
 		this.debit = debit;
 		this.credit = credit;
+		this.transferId = null;
 	}
 	
 	// Getters
@@ -93,4 +97,18 @@ public class Constraint implements Serializable {
 	public void setCredit(double credit) {
 		this.credit = credit;
 	}
+	public Integer getTransferId() {
+        return transferId;
+    }
+    
+    public void setTransferId(Integer transferId) {
+        this.transferId = transferId;
+    }
+	public String getTransferGroupId() {
+        return transferGroupId;
+    }
+    
+    public void setTransferGroupId(String transferGroupId) {
+        this.transferGroupId = transferGroupId;
+    }
 }

@@ -6,34 +6,34 @@ import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
+import java.util.List;
+import java.util.ArrayList;
 
 public class DeleteConstraintDialogFragment extends DialogFragment {
 	
-	public interface OnConstraintDeletedListener {
-		void onConstraintDeleted();
+	// الواجهة لتعكس أنها قد تحذف عدة قيود
+	public interface OnConstraintsDeletedListener {
+		void onConstraintsDeleted(List<Constraint> constraints);
 	}
 	
-	private static final String ARG_CONSTRAINT_ID = "constraint_id";
-	private static final String ARG_CONSTRAINT_DETAILS = "constraint_details";
+	private static final String ARG_CONSTRAINTS = "constraints_list";
 	
-	private int constraintId;
-	private String constraintDetails;
-	private OnConstraintDeletedListener listener;
+	private List<Constraint> constraints;
+	private OnConstraintsDeletedListener listener;
 	
-	public static DeleteConstraintDialogFragment newInstance(Constraint constraint) {
+	// الدالة لإنشاء الـ Dialog، تستقبل قائمة من القيود
+	public static DeleteConstraintDialogFragment newInstance(List<Constraint> constraints) {
 		DeleteConstraintDialogFragment fragment = new DeleteConstraintDialogFragment();
 		Bundle args = new Bundle();
-		args.putInt(ARG_CONSTRAINT_ID, constraint.getId());
-		args.putString(ARG_CONSTRAINT_DETAILS, constraint.getDetails());
+		args.putSerializable(ARG_CONSTRAINTS, new ArrayList<>(constraints));
 		fragment.setArguments(args);
 		return fragment;
 	}
 	
-	public void setOnConstraintDeletedListener(OnConstraintDeletedListener listener) {
+	public void setOnConstraintsDeletedListener(OnConstraintsDeletedListener listener) {
 		this.listener = listener;
 	}
 	
@@ -41,32 +41,69 @@ public class DeleteConstraintDialogFragment extends DialogFragment {
 	@Override
 	public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
 		if (getArguments() != null) {
-			constraintId = getArguments().getInt(ARG_CONSTRAINT_ID, -1);
-			constraintDetails = getArguments().getString(ARG_CONSTRAINT_DETAILS, "");
+			constraints = (List<Constraint>) getArguments().getSerializable(ARG_CONSTRAINTS);
+		}
+		
+		if (constraints == null || constraints.isEmpty()) {
+			// لا يوجد عناصر للحذف، أغلق الـ Dialog
+			dismiss();
+			return new AlertDialog.Builder(getContext()).create();
+		}
+		
+		String message;
+		if (constraints.size() == 1) {
+			// إذا كان هناك قيد واحد فقط، اعرض الرسالة مع تفاصيل القيد
+			Constraint constraint = constraints.get(0);
+			String details = constraint.getDetails();
+			
+			// إذا كان تحويلاً، أضف معلومات إضافية
+			if (constraint.getTransferId() != null) {
+				details = "تحويل: " + details;
+			}
+			
+			message = "هل تريد حذف القيد:\n" + details + "\n؟";
+			} else {
+			// إذا كان هناك عدة قيود، اعرض رسالة عامة مع العدد
+			int transferCount = 0;
+			int regularCount = 0;
+			
+			// عد عدد التحويلات والقيود العادية
+			for (Constraint constraint : constraints) {
+				if (constraint.getTransferId() != null) {
+					transferCount++;
+					} else {
+					regularCount++;
+				}
+			}
+			
+			if (transferCount > 0 && regularCount > 0) {
+				message = "هل أنت متأكد من حذف " + constraints.size() + " من القيود المحددة؟\n" +
+				"(يشمل " + transferCount + " تحويل و " + regularCount + " قيد عادي)";
+				} else if (transferCount > 0) {
+				message = "هل أنت متأكد من حذف " + transferCount + " تحويل؟";
+				} else {
+				message = "هل أنت متأكد من حذف " + regularCount + " قيد؟";
+			}
 		}
 		
 		return new AlertDialog.Builder(getContext())
 		.setTitle("تأكيد الحذف")
-		.setMessage("هل تريد حذف القيد:\n" + constraintDetails + "\n؟")
+		.setMessage(message)
 		.setPositiveButton("نعم", (dialog, which) -> {
-			Log.d("DELETE_DEBUG", "Trying to delete constraint ID: " + constraintId);
+			Log.d("DELETE_DEBUG", "Trying to delete " + constraints.size() + " constraints.");
 			
-			if (constraintId <= 0) {
-				Log.e("DELETE_DEBUG", "Invalid constraint ID: " + constraintId);
-				Toast.makeText(getContext(), "معرّف القيد غير صالح", Toast.LENGTH_SHORT).show();
-				return;
-			}
+			// استخدام DatabaseHelper من النمط Singleton
+			DatabaseHelper dbHelper = DatabaseHelper.getInstance(getContext());
 			
-			DatabaseHelper dbHelper = new DatabaseHelper(getContext());
-			boolean success = dbHelper.deleteConstraint(constraintId);
-			dbHelper.close();
+			// استدعاء دالة الحذف المحدثة
+			boolean success = dbHelper.deleteMixedConstraints(constraints);
 			
 			Log.d("DELETE_DEBUG", "Delete success: " + success);
 			
 			if (success) {
 				Toast.makeText(getContext(), "تم الحذف بنجاح", Toast.LENGTH_SHORT).show();
 				if (listener != null) {
-					listener.onConstraintDeleted();
+					listener.onConstraintsDeleted(constraints);
 				}
 				} else {
 				Toast.makeText(getContext(), "فشل في الحذف", Toast.LENGTH_SHORT).show();
@@ -74,10 +111,5 @@ public class DeleteConstraintDialogFragment extends DialogFragment {
 		})
 		.setNegativeButton("إلغاء", (dialog, which) -> dialog.dismiss())
 		.create();
-	}
-	
-	@Override
-	public void onAttach(@NonNull Context context) {
-		super.onAttach(context);
 	}
 }
